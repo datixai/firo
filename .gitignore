@@ -6,6 +6,7 @@
 # 🔐 SECRETS & CREDENTIALS  (NEVER commit these)
 # ------------------------------------------------------------
 dashboard/service_account_key.json
+secrets/
 **/service_account_key.json
 **/serviceAccountKey.json
 **/service-account*.json
@@ -206,3 +207,8 @@ runs/
 .lock-wscroll
 .cache-loader/
 report.json
+
+# ------------------------------------------------------------
+# ▲ Vercel
+# ------------------------------------------------------------
+.vercel/

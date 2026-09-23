@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="dashboard/logo.png" alt="FIRO Logo" width="110" />
+<img src="public/assets/logo.png" alt="FIRO Logo" width="110" />
 
 # 🔥 FIRO — Wildfire Detection System
 ### Edge AI · Real-Time Monitoring · Forest Fire Early Warning
@@ -33,6 +33,7 @@
   - [Dashboard Setup](#1-dashboard-setup)
   - [Raspberry Pi Setup](#2-raspberry-pi-setup)
   - [Firebase Configuration](#3-firebase-configuration)
+  - [Deploying to Vercel](#4-deploying-to-vercel)
 - [Dashboard Pages](#-dashboard-pages)
 - [Edge Device Pipeline](#-edge-device-pipeline)
 - [Results](#-results)
@@ -88,9 +89,9 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     DASHBOARD LAYER                                 │
 │                                                                     │
-│   🌐 Web Dashboard (HTML/JS + Python Dash)                          │
+│   🌐 Web Dashboard (HTML/JS, hosted on Vercel)                      │
 │   ├── Live map with camera locations (Leaflet)                      │
-│   ├── Real-time alert panel (auto-polls every 5 s)                  │
+│   ├── Real-time alert panel (live Firestore listener)               │
 │   ├── Event log history (filterable)                                │
 │   └── Dark mode · PWA-enabled                                       │
 └─────────────────────────────────────────────────────────────────────┘
@@ -111,7 +112,7 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 | 📜 **Event Log History** | Full searchable log of all detection events with timestamps |
 | 🌙 **Dark / Light Mode** | Full theme support across all dashboard pages |
 | 📱 **PWA Ready** | Installable as a mobile app via service worker + manifest |
-| 📊 **Python Dash View** | Alternative Plotly/Dash analytics panel (`app.py`) for deeper analysis |
+| 📊 **Analytics View** | Last-hour analytics panel (`/analytics`) with map, alert panel and recent log table |
 
 ---
 
@@ -135,7 +136,7 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 | Database | Cloud Firestore |
 | Icons | Font Awesome 6 |
 | PWA | Service Worker + Web App Manifest |
-| Analytics Panel | Python Dash + Plotly |
+| Analytics Panel | Leaflet + Firestore (JavaScript) |
 
 ### Cloud & Infrastructure
 | Component | Technology |
@@ -143,7 +144,7 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 | Database | Firebase Firestore |
 | Authentication | Firebase Auth (Email/Password) |
 | Alerts | WhatsApp (via Firebase trigger) |
-| Hosting | Firebase Hosting (recommended) |
+| Hosting | Vercel (static site + Python serverless function) |
 
 ---
 
@@ -152,33 +153,40 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 ```
 FIRO-FYP/
 │
-├── 📂 dashboard/                    # Web dashboard frontend + Dash backend
-│   ├── index.html                   # Main monitoring dashboard (live map, alerts)
-│   ├── login.html                   # Firebase Auth login/signup page
-│   ├── logs.html                    # Historical fire event log page
-│   ├── settings.html                # User preferences (theme toggle)
-│   ├── login.css                    # Login page styles
-│   ├── login.js                     # Legacy login helper (superseded by login.html)
-│   ├── script.js                    # Firebase initialization script
-│   ├── service-worker.js            # PWA offline caching
+├── 📂 public/                       # Web dashboard (deployed by Vercel as-is)
+│   ├── index.html                   # Main monitoring dashboard (live map, alerts)      → /
+│   ├── login.html                   # Firebase Auth login/signup page                  → /login
+│   ├── logs.html                    # Historical fire event log page                   → /logs
+│   ├── analytics.html               # Last-hour analytics panel (replaces Dash app)    → /analytics
+│   ├── settings.html                # User preferences (theme)                         → /settings
+│   ├── js/
+│   │   ├── firebase-init.js         # Loads config from /api/config, initialises Firebase
+│   │   └── common.js                # Shared helpers (escaping, fire status, coords, theme)
+│   ├── assets/logo.png              # FIRO / university logo
 │   ├── manifest.json                # PWA web app manifest
-│   ├── logo.png                     # FIRO / university logo
-│   ├── app.py                       # Python Dash analytics dashboard
-│   └── service_account_key.json     # ⚠️  SECRET — never commit (in .gitignore)
+│   └── service-worker.js            # PWA offline caching
 │
-├── 📂 Models Source Files/          # Trained & optimized ML model
+├── 📂 api/
+│   └── config.py                    # Vercel serverless function → GET /api/config
+│
+├── 📂 scripts/
+│   └── dev_server.py                # Local preview server (same routes as Vercel)
+│
+├── 📂 models/
 │   └── mobilenetv2_fire_detection.tflite   # INT8 quantized TFLite model
 │
-├── 📂 raspberry-pi/                 # Edge device inference code
-│   ├── capture.py                   # Camera capture + inference loop
-│   ├── firebase_push.py             # Push results to Firestore
-│   └── requirements.txt             # Pi dependencies
+├── 📂 docs/                         # FYP thesis (PDF)
+├── 📂 secrets/                      # ⚠️ Local only, gitignored: service_account_key.json
+├── 📂 raspberry-pi/                 # Edge device inference code (to be added)
 │
+├── vercel.json                      # Vercel config (output dir, clean URLs, headers)
+├── .vercelignore                    # Keeps models/docs/secrets out of deployments
+├── .env.example                     # Template for .env.local / Vercel env vars
 ├── .gitignore                       # Ignores secrets, venvs, IDE files
 └── README.md                        # You are here
 ```
 
-> **Note:** The `raspberry-pi/` folder contains the on-device code that runs the inference loop on Raspberry Pi 5. Both codebases share the same Firebase project.
+> **Note:** The `raspberry-pi/` folder will hold the on-device code that runs the inference loop on Raspberry Pi 5. Both codebases share the same Firebase project.
 
 ---
 
@@ -221,10 +229,10 @@ FIRO-FYP/
 
 ### Prerequisites
 
-- Python 3.10 or 3.11
+- Python 3.10 or newer (the dashboard's local server uses the standard library only)
 - A Firebase project ([create one free](https://console.firebase.google.com))
-- Raspberry Pi 5 with Raspberry Pi OS (64-bit)
-- USB camera
+- A [Vercel](https://vercel.com) account linked to GitHub (for deployment)
+- Raspberry Pi 5 with Raspberry Pi OS (64-bit) and a USB camera
 - Git
 
 ---
@@ -237,32 +245,22 @@ git clone https://github.com/datixai/FIRO-FYP.git
 cd FIRO-FYP
 ```
 
-**Install Python dependencies (for `app.py` Dash dashboard):**
+**Give the dashboard its Firebase web config** (pick one):
+
+- **Option A:** copy `.env.example` to `.env.local` and fill in the values from
+  Firebase Console → Project settings → General → Your apps → Web app.
+- **Option B:** put your existing `service_account_key.json` (with its `firebase_client`
+  section) in `secrets/`. The local server reads only the `firebase_client` part.
+
+**Run it locally** (no `pip install` needed):
 ```bash
-cd dashboard
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install dash plotly pandas google-cloud-firestore
+python scripts/dev_server.py
+# Open http://localhost:3000
 ```
 
-**Set your Firebase credentials:**
-```bash
-export GCP_KEY_PATH=/path/to/your/service_account_key.json
-```
-
-**Run the Dash analytics dashboard:**
-```bash
-python app.py
-# Open http://127.0.0.1:8050
-```
-
-**For the HTML dashboard** (`index.html`, `login.html`, etc.) — simply open in a browser or deploy to Firebase Hosting:
-```bash
-npm install -g firebase-tools
-firebase login
-firebase init hosting
-firebase deploy
-```
+The local server mirrors Vercel: pages are served from `public/` with clean URLs
+(`/login`, `/logs`, `/analytics`, `/settings`) and `/api/config` runs the same code as
+the Vercel function in `api/config.py`.
 
 ---
 
@@ -303,54 +301,77 @@ The script will:
 1. Go to [Firebase Console](https://console.firebase.google.com) → your project
 2. Enable **Firestore Database** — start in production mode
 3. Enable **Authentication** → Email/Password provider
-4. Create your Firestore collection: `fire_logs`
-5. Download **Service Account Key** (Project Settings → Service Accounts → Generate New Private Key)
-6. **⚠️ Never commit this file** — it is listed in `.gitignore`
+4. Enable **Authentication** → Anonymous provider (used by the public logs page)
+5. Detection logs live at `artifacts/{projectId}/public/data/fire_logs`
+6. Download **Service Account Key** (Project Settings → Service Accounts → Generate New Private Key) for the Raspberry Pi
+7. **⚠️ Never commit this file** — keep it in `secrets/` (gitignored)
 
 **Firestore document structure** (written by Raspberry Pi):
 ```json
 {
   "timestamp_ms": 1704067200000,
   "timestamp_str": "2026-01-01 12:00:00",
-  "detection_class": "Fire",
+  "detection_class": "FIRE DETECTED",
   "fire_probability": 0.94,
-  "camera_location": "Khuiratta Tower 1",
-  "coords_x": 33.6844,
-  "coords_y": 73.0479,
+  "camera_location": "STP UOK",
+  "coords_x": 73.9029657,
+  "coords_y": 33.4855959,
   "device_id": "rpi5-unit-01"
 }
 ```
+
+> `coords_y` is **latitude** and `coords_x` is **longitude**. The dashboard marks a camera
+> as on fire when `detection_class` contains "fire" (and not "no fire") until someone
+> presses **Resolved**, which sets `status: "resolved"`.
+
+---
+
+### 4. Deploying to Vercel
+
+1. Push this repo to GitHub.
+2. In Vercel: **Add New → Project → Import** `FIRO-FYP`.
+   - Framework Preset: **Other**, Root Directory: `./` (leave build settings empty;
+     `vercel.json` already sets the output directory to `public`).
+3. Add these **Environment Variables** (Production, Preview and Development):
+   `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`,
+   `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, and optionally `FIRO_WHATSAPP_NUMBER`.
+4. **Deploy.** Open `https://<your-project>.vercel.app/api/config` to confirm the config
+   loads, then `/login` to sign in.
+
+Only public Firebase web settings are sent to Vercel. The service-account private key is
+never uploaded; data access is protected by Firebase Authentication and your Firestore
+security rules.
 
 ---
 
 ## 🖥️ Dashboard Pages
 
-### Login Screen
+### Login Screen (`/login`)
 Firebase-authenticated login/signup. Session expires on browser close (session persistence).  
-**File:** `dashboard/login.html`
+**File:** `public/login.html`
 
-### Main Dashboard (`index.html`)
+### Main Dashboard (`/`)
 - **Live Leaflet map** — colour-coded markers (🔴 Fire / 🟢 Safe) at each camera location
-- **Alert panel** — pulses red with critical fire alert details when fire is detected
-- **Stats cards** — total alerts, active cameras, latest detection time
-- **Real-time updates** — auto-polls Firebase every 5 seconds
-- **Dark / Light mode** toggle
+- **Live fire alert log** — active fires first, with **Send** (WhatsApp) and **Resolved** actions
+- **Stats cards** — active fires, total cameras, latest detection time
+- **Real-time updates** — live Firestore listener, no page refresh needed
+- **Dark / Light mode** toggle and fullscreen in the settings sidebar
 
-### Fire Event Log (`logs.html`)
+### Fire Event Log (`/logs`)
 - Full history of all detection events from Firebase
-- Filter by: Fire / No Fire / All
+- Filter by camera and by Fire / Safe / All
 - Each entry shows: timestamp, location, confidence score, classification
-- Dark mode supported
+- Viewable with the link (anonymous sign-in); dark mode supported
 
-### Settings (`settings.html`)
-- Theme preference (Light / Dark)
+### Analytics (`/analytics`)
+- Last-hour view of the latest reading per camera (replaces the old Python Dash `app.py`)
+- Dark map with markers sized by fire probability
+- Alert panel that pulses red when a camera reports fire
+- Recent log table with red highlighting for fire events
+
+### Settings (`/settings`)
+- Theme preference (Light / Dark), shared with all pages
 - More options in development (alert thresholds, notification recipients)
-
-### Python Dash Dashboard (`app.py`)
-- Alternative analytics view using Plotly/Dash
-- Scatter mapbox with fire probability bubble sizing
-- Recent log table with conditional red highlighting for fire events
-- Last-hour data window with 5-second polling
 
 ---
 

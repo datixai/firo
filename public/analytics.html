@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO — Analytics</title>
+  <meta name="theme-color" content="#1f7a3a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!--
+    Analytics panel (replaces the old Python Dash view from app.py).
+    Shows the last hour of readings: map of cameras, alert panel and
+    the most recent log entries. Updates live from Firestore.
+  -->
+  <style>
+    body { background: #111827; color: #ffffff; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; }
+    #fire-map { height: 100%; min-height: 480px; border-radius: 0.75rem; }
+    .leaflet-container { background: #161b22; }
+    .log-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .log-table th { background: #30363d; color: #ffffff; font-weight: 700; }
+    .log-table th, .log-table td { border: 1px solid #30363d; text-align: left; padding: 8px; }
+    .log-table td { background: #161b22; color: #e6e6e6; }
+    .log-table tr.fire td { background: rgba(153,27,27,0.4); color: #fca5a5; font-weight: 700; }
+  </style>
+</head>
+
+<body class="p-6 min-h-screen">
+
+  <!-- Header -->
+  <div class="flex flex-wrap gap-3 justify-between items-center pb-4 border-b border-gray-700 mb-4">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-sm px-3 py-1 rounded bg-gray-800 hover:bg-gray-700">← Back</a>
+      <h1 class="text-2xl md:text-3xl font-bold text-cyan-400 tracking-wider">FIRO — Analytics Dashboard (Last Hour)</h1>
+    </div>
+    <div class="flex items-center space-x-4">
+      <span id="connection-status" class="text-sm font-medium px-3 py-1 rounded-full bg-gray-800 text-gray-300">Connecting…</span>
+      <p id="last-updated-time" class="text-sm text-gray-400">N/A</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" style="min-height:80vh;">
+    <!-- Map -->
+    <div class="lg:col-span-2 rounded-xl bg-gray-800 shadow-xl overflow-hidden">
+      <div id="fire-map"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="lg:col-span-1 flex flex-col space-y-6">
+      <div id="alert-panel" class="p-6 rounded-xl shadow-xl flex flex-col justify-center items-center flex-shrink-0 bg-gray-800">
+        <div id="alert-icon" style="font-size:4rem;">⏳</div>
+        <h2 id="alert-header" class="text-3xl font-extrabold tracking-tight text-white mb-1 text-center">LOADING</h2>
+        <p id="alert-message" class="text-sm text-gray-400 text-center">Waiting for data…</p>
+      </div>
+
+      <div class="flex-grow flex flex-col rounded-xl bg-gray-800 shadow-xl p-6">
+        <h3 class="text-xl font-semibold mb-3 text-cyan-400 border-b border-gray-700 pb-2">RECENT LOG HISTORY (Last 60 Mins)</h3>
+        <div id="log-table-container" class="overflow-auto flex-grow">
+          <p class="text-center py-4 text-gray-500 text-sm">No data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script type="module">
+    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
+    import { esc, isActiveFire, getLatLon, formatTime, registerServiceWorker } from "/js/common.js";
+    import { onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { collection, query, where, orderBy, limit, onSnapshot }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    registerServiceWorker();
+
+    const WINDOW_MS         = 60 * 60 * 1000;  // last hour
+    const MAX_DOCS          = 50;              // same as the old Dash query
+    const REFRESH_MS        = 5000;            // re-render (window moves forward)
+    const RESUBSCRIBE_MS    = 60 * 1000;       // move the Firestore query window
+    const TABLE_ROWS        = 5;
+
+    const statusEl  = document.getElementById("connection-status");
+    const updatedEl = document.getElementById("last-updated-time");
+    const panelEl   = document.getElementById("alert-panel");
+    const iconEl    = document.getElementById("alert-icon");
+    const headerEl  = document.getElementById("alert-header");
+    const messageEl = document.getElementById("alert-message");
+    const tableEl   = document.getElementById("log-table-container");
+
+    const PANEL_BASE = "p-6 rounded-xl shadow-xl flex flex-col justify-center items-center flex-shrink-0 ";
+    const PILL_BASE  = "text-sm font-medium px-3 py-1 rounded-full ";
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = PILL_BASE + cls;
+    }
+
+    function setPanel(icon, header, message, fire) {
+      iconEl.textContent    = icon;
+      headerEl.textContent  = header;
+      messageEl.textContent = message;
+      panelEl.className = PANEL_BASE + (fire ? "bg-red-900/50 animate-pulse" : "bg-gray-800");
+    }
+
+    // ── Firebase ──
+    let firebase;
+    try {
+      firebase = await initFirebase();
+    } catch (err) {
+      console.error(err);
+      setStatus("DB Disconnected", "bg-red-900/50 text-red-300");
+      setPanel("⚠️", "DB NOT CONNECTED", "Could not load configuration from /api/config.", false);
+      throw err;
+    }
+    const { auth, db, config } = firebase;
+
+    // ── Auth guard (same as the main dashboard) ──
+    await new Promise((resolve) => {
+      onAuthStateChanged(auth, (user) => {
+        if (!user || user.isAnonymous) { window.location.replace("/login"); return; }
+        resolve();
+      });
+    });
+
+    // ── Map (dark basemap like the old Dash view) ──
+    const map = L.map("fire-map", { zoomControl: true }).setView([33.73, 73.08], 8);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 19,
+    }).addTo(map);
+    const markerLayer = L.layerGroup().addTo(map);
+    let hasFitted = false;
+
+    // ── Data ──
+    let docs = [];
+    let unsubscribe = null;
+
+    function subscribe() {
+      if (unsubscribe) unsubscribe();
+      const since = Date.now() - WINDOW_MS;
+      const q = query(
+        collection(db, ...fireLogsPath(config)),
+        where("timestamp_ms", ">=", since),
+        orderBy("timestamp_ms", "desc"),
+        limit(MAX_DOCS)
+      );
+      unsubscribe = onSnapshot(q, (snap) => {
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      }, (err) => {
+        console.error("[FIRO] Firestore listener error:", err);
+        setStatus("DB Disconnected", "bg-red-900/50 text-red-300");
+        setPanel("⚠️", "DB NOT CONNECTED", err.message, false);
+      });
+    }
+
+    function render() {
+      const since  = Date.now() - WINDOW_MS;
+      const recent = docs.filter(d => (d.timestamp_ms || 0) >= since);
+
+      // Latest reading per camera (like drop_duplicates in the Dash version)
+      const latestByCamera = new Map();
+      recent.forEach(d => {
+        const name = d.camera_location || "Unknown";
+        if (!latestByCamera.has(name)) latestByCamera.set(name, d);   // docs are newest-first
+      });
+      const cameras = [...latestByCamera.values()];
+
+      markerLayer.clearLayers();
+
+      if (cameras.length === 0) {
+        setStatus("No Data", "bg-yellow-900 text-yellow-300");
+        setPanel("✅", "ALL SYSTEMS GREEN", "No fire threat detected in the last hour.", false);
+        tableEl.innerHTML = `<p class="text-center py-4 text-gray-500 text-sm">No data.</p>`;
+        updatedEl.textContent = "N/A";
+        return;
+      }
+
+      // Map markers: red = fire, lime = safe; size grows with probability
+      const bounds = L.latLngBounds([]);
+      cameras.forEach(d => {
+        const pos = getLatLon(d);
+        if (!pos) return;
+        const fire = isActiveFire(d);
+        const prob = Number(d.fire_probability) || 0;
+        L.circleMarker([pos.lat, pos.lon], {
+          radius: Math.max(6, prob * 15),
+          color: fire ? "red" : "lime", fillColor: fire ? "red" : "lime",
+          fillOpacity: 0.8, weight: 1,
+        }).bindPopup(
+          `<strong>${esc(d.camera_location || "Unknown")}</strong><br/>` +
+          `fire_probability: ${prob.toFixed(2)}<br/>severity: ${esc(d.detection_class || "N/A")}`
+        ).addTo(markerLayer);
+        bounds.extend([pos.lat, pos.lon]);
+      });
+      if (!hasFitted && bounds.isValid()) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 }); hasFitted = true; }
+
+      // Alert panel: highest-probability camera currently reporting fire
+      const fires = cameras.filter(isActiveFire)
+        .sort((a, b) => (Number(b.fire_probability) || 0) - (Number(a.fire_probability) || 0));
+      if (fires.length) {
+        const top  = fires[0];
+        const prob = ((Number(top.fire_probability) || 0) * 100).toFixed(1) + "%";
+        setPanel("🔥", "⚠️  FIRE DETECTED", `${top.camera_location || "Unknown"} — ${prob} probability`, true);
+      } else {
+        setPanel("✅", "ALL SYSTEMS GREEN", "No fire threat detected in the last hour.", false);
+      }
+
+      // Recent log table
+      const rows = cameras.slice(0, TABLE_ROWS).map(d => {
+        const prob = ((Number(d.fire_probability) || 0) * 100).toFixed(2) + "%";
+        return `<tr class="${isActiveFire(d) ? "fire" : ""}">
+                  <td>${esc(formatTime(d))}</td>
+                  <td>${esc(d.camera_location || "Unknown")}</td>
+                  <td>${prob}</td>
+                </tr>`;
+      }).join("");
+      tableEl.innerHTML = `<table class="log-table">
+          <thead><tr><th>Time</th><th>Location</th><th>Prob.</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+      setStatus("Connected", "bg-green-900 text-green-300");
+      updatedEl.textContent = new Date().toLocaleTimeString();
+    }
+
+    subscribe();
+    setInterval(render, REFRESH_MS);
+    setInterval(subscribe, RESUBSCRIBE_MS);
+  </script>
+</body>
+</html>

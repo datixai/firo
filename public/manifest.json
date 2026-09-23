@@ -2,12 +2,13 @@
   "name": "AJK Fire Monitoring",
   "short_name": "AJK Fire",
   "description": "Realtime wildfire monitoring dashboard for AJK Fire Monitoring Department.",
-  "start_url": "/index.html",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1f7a3a",
   "icons": [
-    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/assets/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/logo.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

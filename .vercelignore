@@ -1,0 +1,14 @@
+# Files Vercel does not need to deploy the dashboard
+# (only public/, api/ and vercel.json are used)
+models/
+docs/
+scripts/
+secrets/
+raspberry-pi/
+venv/
+.venv/
+__pycache__/
+*.pdf
+*.tflite
+.env
+.env.*

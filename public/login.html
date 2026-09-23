@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Login | Fire Monitoring</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1f7a3a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
@@ -13,7 +16,7 @@
 
     <!-- Logo -->
     <div class="flex justify-center mb-4">
-      <img src="./logo.png" alt="FIRO Logo" class="w-20 h-20 rounded" />
+      <img src="/assets/logo.png" alt="FIRO Logo" class="w-20 h-20 rounded" />
     </div>
 
     <h2 id="form-title" class="text-2xl font-bold text-center mb-6 text-green-700">
@@ -45,9 +48,9 @@
     <p id="error" class="text-red-500 text-sm mt-3 text-center"></p>
   </div>
 
-  <!-- ── Firebase Auth (config loaded from app.py) ── -->
+  <!-- ── Firebase Auth (config loaded from /api/config) ── -->
   <script type="module">
-    import { initFirebase } from "./firebase-init.js";
+    import { initFirebase } from "/js/firebase-init.js";
     import {
       setPersistence,
       browserSessionPersistence,
@@ -68,7 +71,7 @@
     let isSignup = false;
 
     try {
-      // ── Load config from app.py → initialize Firebase ──
+      // ── Load config from /api/config → initialize Firebase ──
       const { auth } = await initFirebase();
 
       // Session only — logs out when tab closes
@@ -115,8 +118,8 @@
       });
 
     } catch (err) {
-      // Config fetch failed — app.py is probably not running
-      loadingMsg.textContent = "⚠️ Cannot connect to server. Is app.py running?";
+      // Config fetch failed — /api/config missing or env vars not set
+      loadingMsg.textContent = "⚠️ Cannot load configuration. Check /api/config (see console).";
       loadingMsg.classList.remove("text-gray-400");
       loadingMsg.classList.add("text-red-500");
       console.error("[FIRO] Firebase init failed:", err);

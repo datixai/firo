@@ -5,6 +5,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fire Monitoring Department</title>
+  <meta name="theme-color" content="#1f7a3a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -33,7 +36,7 @@
       font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
 
     body { background: var(--bg-light); color: var(--text-light); transition: background .22s, color .22s; }
-    [data-theme="dark"] body { background: var(--bg-dark); color: var(--text-dark); }
+    body[data-theme="dark"] { background: var(--bg-dark); color: var(--text-dark); }
 
     .card { background: var(--card-light); border: 1px solid var(--border-light);
       border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all .22s; }
@@ -117,7 +120,7 @@
     <header class="card main-header">
       <div class="header-wrapper" style="width:100%;">
         <div class="header-left" style="display:flex;align-items:center;gap:12px;">
-          <img src="./logo.png" alt="logo" class="w-12 h-12 rounded" />
+          <img src="/assets/logo.png" alt="logo" class="w-12 h-12 rounded" />
         </div>
         <div class="header-center">
           <h1>Fire Monitoring Department</h1>
@@ -131,12 +134,12 @@
             <button id="menu-btn" class="p-2 rounded bg-gray-100"><i class="fa-solid fa-bars"></i></button>
             <div id="menu-panel" class="menu-panel hidden card" aria-hidden="true" style="right:0;">
               <div class="menu-header">
-                <img src="./logo.png" alt="logo" class="w-7 h-7 rounded" />
+                <img src="/assets/logo.png" alt="logo" class="w-7 h-7 rounded" />
                 <div style="font-weight:800;font-size:14px;">FIRO</div>
               </div>
               <a href="/"><i class="fa-solid fa-house"></i> Home</a>
-              <a href="/logs" target="_blank"><i class="fa-solid fa-list"></i> Logs</a>
-              <a href="/dash/" target="_blank"><i class="fa-solid fa-chart-line"></i> Analytics</a>
+              <a href="/logs"><i class="fa-solid fa-list"></i> Logs</a>
+              <a href="/analytics"><i class="fa-solid fa-chart-line"></i> Analytics</a>
               <a href="#" id="open-settings"><i class="fa-solid fa-gear"></i> Settings</a>
               <hr class="my-2 opacity-30" />
               <a href="#" id="logout-btn" style="color:#dc2626;">
@@ -242,14 +245,33 @@
 
   <!-- Firebase + App Logic -->
   <script type="module">
-    import { initFirebase }       from "./firebase-init.js";
+    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
+    import { esc, isActiveFire, isResolved, getLatLon, formatTime,
+             THEME_KEY, getSavedTheme, applyTheme, startClock, registerServiceWorker } from "/js/common.js";
     import { signOut, onAuthStateChanged }
       from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, onSnapshot, doc, updateDoc }
       from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // ── Init Firebase (config comes from service_account_key.json via app.py) ──
-    const { auth, db, config } = await initFirebase();
+    registerServiceWorker();
+
+    // ── Theme + clock (work even before Firebase is ready) ──
+    let theme = getSavedTheme();
+    applyTheme(theme);
+    startClock(document.getElementById("current-time"));
+
+    // ── Init Firebase (config comes from /api/config) ──
+    let firebase;
+    try {
+      firebase = await initFirebase();
+    } catch (err) {
+      console.error(err);
+      const el = document.getElementById("auth-status");
+      el.textContent = "Config error — see console";
+      el.style.color = "#dc2626";
+      throw err;
+    }
+    const { auth, db, config, settings } = firebase;
 
     // ── Auth guard ──
     onAuthStateChanged(auth, (user) => {
@@ -297,10 +319,8 @@
       return L.divIcon({ html: el.outerHTML, className: "", iconSize: [20, 20], iconAnchor: [10, 10] });
     }
 
-    const isFire = (e) => String(e.detection_class || "").toLowerCase().includes("fire");
-
-    // Firestore collection path uses projectId from config
-    const q = collection(db, "artifacts", config.projectId, "public", "data", "fire_logs");
+    // Firestore collection: artifacts/{projectId}/public/data/fire_logs
+    const q = collection(db, ...fireLogsPath(config));
 
     onSnapshot(q, (snap) => {
       const cameras = new Map();
@@ -309,16 +329,16 @@
 
       snap.forEach((d) => {
         const e = d.data(); e.id = d.id;
-        const lat = Number(e.coords_y), lon = Number(e.coords_x);
-        if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+        const pos = getLatLon(e);
+        if (!pos) return;
 
         alerts.push(e);
         if (e.timestamp_ms && e.timestamp_ms > latestTime) latestTime = e.timestamp_ms;
 
         const camName = e.camera_location || e.id;
-        const prev    = cameras.get(camName) || { lat, lon, latestTS: 0, fire: false, docs: [] };
-        prev.lat = lat; prev.lon = lon; prev.docs.push(e);
-        if (isFire(e) && String(e.status || "").toLowerCase() !== "resolved") prev.fire = true;
+        const prev    = cameras.get(camName) || { lat: pos.lat, lon: pos.lon, latestTS: 0, fire: false, docs: [] };
+        prev.lat = pos.lat; prev.lon = pos.lon; prev.docs.push(e);
+        if (isActiveFire(e)) prev.fire = true;
         if (e.timestamp_ms && e.timestamp_ms > prev.latestTS) prev.latestTS = e.timestamp_ms;
         cameras.set(camName, prev);
       });
@@ -339,7 +359,7 @@
         if (cameraMarkers.has(name)) {
           const m = cameraMarkers.get(name);
           m.setLatLng(latlng).setIcon(makeIcon(color, cam.fire));
-          m._popup && m.setPopupContent(buildPopup(name, cam));
+          m.getPopup() && m.setPopupContent(buildPopup(name, cam));
         } else {
           const m = L.marker(latlng, { icon: makeIcon(color, cam.fire) }).addTo(map);
           m.bindPopup(buildPopup(name, cam));
@@ -353,8 +373,7 @@
 
       // Sort: active fires first, then by time desc
       alerts.sort((a, b) => {
-        const af = isFire(a) && String(a.status || "").toLowerCase() !== "resolved";
-        const bf = isFire(b) && String(b.status || "").toLowerCase() !== "resolved";
+        const af = isActiveFire(a), bf = isActiveFire(b);
         if (af && !bf) return -1; if (!af && bf) return 1;
         return (b.timestamp_ms || 0) - (a.timestamp_ms || 0);
       });
@@ -364,40 +383,44 @@
         alertList.innerHTML = `<div class="text-sm text-gray-500 italic">No alerts</div>`;
       } else {
         alerts.forEach(a => {
-          const fire = isFire(a) && String(a.status || "").toLowerCase() !== "resolved";
+          const fire = isActiveFire(a);
+          const { lat, lon } = getLatLon(a);
           const card = document.createElement("div");
           card.className = "rounded p-3 mb-3 " + (fire ? "alert-card-fire" : "alert-card-safe");
           card.innerHTML = `
             <div class="flex justify-between items-start">
               <div class="font-semibold">${esc(a.camera_location || a.id)}</div>
               <div class="text-xs ${fire ? "text-red-700" : "text-green-700"}">
-                ${esc(a.detection_class)}${String(a.status||"").toLowerCase()==="resolved"?" (resolved)":""}
+                ${esc(a.detection_class)}${isResolved(a) ? " (resolved)" : ""}
               </div>
             </div>
-            <div class="text-xs text-gray-500 mt-2">Coords: ${a.coords_y}, ${a.coords_x}</div>
-            <div class="text-xs text-gray-500">Prob: ${a.fire_probability ?? 0}</div>
-            <div class="text-xs text-gray-500 mb-2">
-              Time: ${a.timestamp_str || (a.timestamp_ms ? new Date(a.timestamp_ms).toLocaleString() : "--")}
-            </div>
+            <div class="text-xs text-gray-500 mt-2">Coords: ${lat}, ${lon}</div>
+            <div class="text-xs text-gray-500">Prob: ${esc(a.fire_probability ?? 0)}</div>
+            <div class="text-xs text-gray-500 mb-2">Time: ${esc(formatTime(a))}</div>
             <div class="flex justify-end gap-2">
               <button class="btn btn-send small send"
-                data-lat="${a.coords_y}" data-lon="${a.coords_x}" data-name="${esc(a.camera_location||a.id)}">
+                data-lat="${lat}" data-lon="${lon}" data-name="${esc(a.camera_location || a.id)}">
                 Send
               </button>
-              ${fire ? `<button class="btn btn-resolve small resolve" data-id="${a.id}">Resolved</button>` : ""}
+              ${fire ? `<button class="btn btn-resolve small resolve" data-id="${esc(a.id)}">Resolved</button>` : ""}
             </div>`;
           alertList.appendChild(card);
         });
       }
 
-      // Populate camera dropdown
-      const sorted = Array.from(cameras.keys()).sort((x,y) => x.localeCompare(y));
+      // Populate camera dropdown (keep current selection)
+      const selected = cameraSelect.value;
+      const sorted = Array.from(cameras.keys()).sort((x, y) => x.localeCompare(y));
       cameraSelect.innerHTML = '<option value="">-- Select camera --</option>';
       sorted.forEach(name => {
         const o = document.createElement("option");
         o.value = name; o.textContent = name;
         cameraSelect.appendChild(o);
       });
+      if (cameras.has(selected)) cameraSelect.value = selected;
+    }, (err) => {
+      console.error("[FIRO] Firestore listener error:", err);
+      alertList.innerHTML = `<div class="text-sm text-red-600">Could not load alerts: ${esc(err.message)}</div>`;
     });
 
     function buildPopup(name, cam) {
@@ -408,23 +431,25 @@
               <small>${status} · ${t}</small></div>`;
     }
 
-    function esc(s) {
-      return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    }
-
     // ── Alert list clicks (send / resolve) ──
     alertList.addEventListener("click", async (ev) => {
-      const t = ev.target;
+      const t = ev.target.closest("button");
+      if (!t) return;
       if (t.classList.contains("send")) {
         const { lat, lon, name } = t.dataset;
-        const text = `🚨 Fire detected at ${encodeURIComponent(name)}%0ACoordinates: ${lat}, ${lon}%0AMap: https://www.google.com/maps?q=${lat},${lon}%0ATime: ${new Date().toLocaleString()}%0A%0A🔥 آگ لگی ہوئی ہے — براہ کرم فوری کارروائی کریں۔`;
-        window.open(`https://wa.me/923408226347?text=${text}`, "_blank");
+        const text =
+          `🚨 Fire detected at ${name}\n` +
+          `Coordinates: ${lat}, ${lon}\n` +
+          `Map: https://www.google.com/maps?q=${lat},${lon}\n` +
+          `Time: ${new Date().toLocaleString()}\n\n` +
+          `🔥 آگ لگی ہوئی ہے — براہ کرم فوری کارروائی کریں۔`;
+        window.open(`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(text)}`, "_blank");
       }
       if (t.classList.contains("resolve")) {
         const id = t.dataset.id; if (!id) return;
         if (!confirm("Mark this alert as resolved and set camera SAFE?")) return;
         try {
-          const ref = doc(db, "artifacts", config.projectId, "public", "data", "fire_logs", id);
+          const ref = doc(db, ...fireLogsPath(config), id);
           await updateDoc(ref, { detection_class: "SAFE", fire_probability: 0, status: "resolved" });
         } catch (err) { console.error("Resolve failed", err); alert("Failed (see console)."); }
       }
@@ -457,14 +482,15 @@
       settingsSidebar.setAttribute("aria-hidden", "true");
     });
 
-    // ── Theme ──
-    function applyTheme(t) {
-      document.body.setAttribute("data-theme", t === "dark" ? "dark" : "");
-      localStorage.setItem("fmd_theme", t);
-    }
-    let theme = localStorage.getItem("fmd_theme") || "light";
-    applyTheme(theme);
+    // ── Theme toggle ──
     toggleThemeBtn.addEventListener("click", () => { theme = theme === "light" ? "dark" : "light"; applyTheme(theme); });
+    // Follow theme changes made on the Settings page (other tab or opener message)
+    window.addEventListener("storage", (e) => {
+      if (e.key === THEME_KEY && e.newValue) { theme = e.newValue; applyTheme(theme); }
+    });
+    window.addEventListener("message", (e) => {
+      if (e.origin === window.location.origin && e.data?.action === "setTheme") { theme = e.data.value; applyTheme(theme); }
+    });
 
     // ── Fullscreen ──
     fullscreenBtn.addEventListener("click", () => {
@@ -476,9 +502,6 @@
     clearLogsBtn.addEventListener("click", () => {
       alertList.innerHTML = `<div class="text-sm text-gray-500 italic">Cleared. New alerts will appear here.</div>`;
     });
-
-    // ── Clock ──
-    setInterval(() => document.getElementById("current-time").textContent = new Date().toLocaleString(), 1000);
   </script>
 </body>
 </html>

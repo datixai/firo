@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fire Logs</title>
+  <meta name="theme-color" content="#1f7a3a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
@@ -11,7 +14,7 @@
   <style>
     body { font-family: Inter, sans-serif; background: #f3f4f6; color: #111827;
       padding: 20px; transition: background 0.3s, color 0.3s; overflow-x: hidden; }
-    [data-theme="dark"] body { background: #0B1B2B; color: #ffffff; }
+    body[data-theme="dark"] { background: #0B1B2B; color: #ffffff; }
 
     .card { background: white; padding: 16px; border-radius: 12px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.05); transition: all 0.3s; }
@@ -46,7 +49,7 @@
     <!-- Header -->
     <div class="card mb-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <img src="./logo.png" class="w-10 h-10 rounded" alt="logo" />
+        <img src="/assets/logo.png" class="w-10 h-10 rounded" alt="logo" />
         <div>
           <div class="font-bold text-xl">🔥 Fire Logs</div>
           <div class="text-sm text-gray-500">Real-time event viewer</div>
@@ -80,25 +83,47 @@
   </div>
 
   <script type="module">
-    import { initFirebase }          from "./firebase-init.js";
-    import { signInAnonymously }     from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
+    import { esc, isFireClass, isActiveFire, isResolved, getLatLon, formatTime,
+             getSavedTheme, applyTheme, startClock } from "/js/common.js";
+    import { signInAnonymously, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, onSnapshot, orderBy, query }
       from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // ── Init (config from service_account_key.json via app.py) ──
-    const { auth, db, config } = await initFirebase();
+    // Theme sync with main dashboard + clock
+    applyTheme(getSavedTheme());
+    startClock(document.getElementById("current-time"));
 
-    // Logs page uses anonymous auth so anyone with the link can view history
-    await signInAnonymously(auth);
-
-    const container  = document.getElementById("log-content");
-    const camFilter  = document.getElementById("camera-filter");
+    const container    = document.getElementById("log-content");
+    const camFilter    = document.getElementById("camera-filter");
     const statusFilter = document.getElementById("status-filter");
 
-    const q = query(
-      collection(db, "artifacts", config.projectId, "public", "data", "fire_logs"),
-      orderBy("timestamp_ms", "desc")
-    );
+    // ── Init (config from /api/config) ──
+    let firebase;
+    try {
+      firebase = await initFirebase();
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="text-sm text-red-600">Could not load configuration (see console).</div>`;
+      throw err;
+    }
+    const { auth, db, config } = firebase;
+
+    // Logs page is viewable by anyone with the link: reuse the logged-in
+    // session if there is one, otherwise sign in anonymously.
+    await new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        unsubscribe();
+        if (!user) {
+          try { await signInAnonymously(auth); }
+          catch (err) { console.error("[FIRO] Anonymous sign-in failed:", err); }
+        }
+        resolve();
+      });
+    });
+
+    const q = query(collection(db, ...fireLogsPath(config)), orderBy("timestamp_ms", "desc"));
 
     let allLogs = [];
 
@@ -108,12 +133,11 @@
       let filtered = [...allLogs];
 
       if (selCam) filtered = filtered.filter(l => l.camera_location === selCam);
-      if (selStatus === "fire") filtered = filtered.filter(l => String(l.detection_class).toLowerCase().includes("fire"));
-      if (selStatus === "safe") filtered = filtered.filter(l => !String(l.detection_class).toLowerCase().includes("fire"));
+      if (selStatus === "fire") filtered = filtered.filter(l => isFireClass(l));
+      if (selStatus === "safe") filtered = filtered.filter(l => !isFireClass(l));
 
       filtered.sort((a, b) => {
-        const af = String(a.detection_class).toLowerCase().includes("fire") && String(a.status||"") !== "resolved";
-        const bf = String(b.detection_class).toLowerCase().includes("fire") && String(b.status||"") !== "resolved";
+        const af = isActiveFire(a), bf = isActiveFire(b);
         if (af && !bf) return -1; if (!af && bf) return 1;
         return (b.timestamp_ms || 0) - (a.timestamp_ms || 0);
       });
@@ -128,21 +152,22 @@
       list.className = "space-y-3";
 
       filtered.forEach(d => {
-        const isFire = String(d.detection_class).toLowerCase().includes("fire") && String(d.status||"") !== "resolved";
-        const div    = document.createElement("div");
-        div.className = `log-entry ${isFire ? "fire-entry" : ""}`;
+        const fire = isActiveFire(d);
+        const pos  = getLatLon(d);
+        const div  = document.createElement("div");
+        div.className = `log-entry ${fire ? "fire-entry" : ""}`;
         div.innerHTML = `
           <div class="flex justify-between">
             <div>
-              <strong>${isFire ? "🔥 " : ""}${d.camera_location || "Unknown"}</strong>
-              <div class="text-xs text-gray-500">${d.timestamp_str || new Date(d.timestamp_ms).toLocaleString()}</div>
+              <strong>${fire ? "🔥 " : ""}${esc(d.camera_location || "Unknown")}</strong>
+              <div class="text-xs text-gray-500">${esc(formatTime(d))}</div>
             </div>
-            <div class="text-sm font-medium ${isFire ? "text-red-600" : "text-green-600"}">
-              ${d.detection_class}${String(d.status||"").toLowerCase()==="resolved" ? " (resolved)" : ""}
+            <div class="text-sm font-medium ${fire ? "text-red-600" : "text-green-600"}">
+              ${esc(d.detection_class)}${isResolved(d) ? " (resolved)" : ""}
             </div>
           </div>
           <div class="text-xs text-gray-600 mt-2">
-            Coords: ${d.coords_y}, ${d.coords_x} | Prob: ${d.fire_probability}
+            Coords: ${pos ? `${pos.lat}, ${pos.lon}` : "--"} | Prob: ${esc(d.fire_probability)}
           </div>`;
         list.appendChild(div);
       });
@@ -154,24 +179,20 @@
       allLogs = [];
       snapshot.forEach(doc => allLogs.push(doc.data()));
 
+      const selected   = camFilter.value;
       const uniqueCams = [...new Set(allLogs.map(d => d.camera_location).filter(Boolean))].sort();
       camFilter.innerHTML = '<option value="">All Cameras</option>' +
-        uniqueCams.map(c => `<option value="${c}">${c}</option>`).join("");
+        uniqueCams.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+      if (uniqueCams.includes(selected)) camFilter.value = selected;
 
       renderLogs();
+    }, (err) => {
+      console.error("[FIRO] Firestore listener error:", err);
+      container.innerHTML = `<div class="text-sm text-red-600">Could not load logs: ${esc(err.message)}</div>`;
     });
 
     camFilter.addEventListener("change", renderLogs);
     statusFilter.addEventListener("change", renderLogs);
-
-    // Theme sync with main dashboard
-    const globalTheme = localStorage.getItem("fmd_theme") || "light";
-    document.body.setAttribute("data-theme", globalTheme === "dark" ? "dark" : "");
-
-    // Clock
-    setInterval(() => {
-      document.getElementById("current-time").textContent = new Date().toLocaleString();
-    }, 1000);
   </script>
 </body>
 </html>

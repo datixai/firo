@@ -4,12 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Settings — Fire Monitoring</title>
+  <meta name="theme-color" content="#1f7a3a" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: Inter, sans-serif; background:#f3f4f6; color:#111827; padding:20px; }
     .card { background:white; padding:16px; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.05); }
     .page { max-width:900px; margin:auto; }
+    body[data-theme="dark"] { background:#0B1B2B; color:#ffffff; }
+    body[data-theme="dark"] .card { background:#102432; }
+    body[data-theme="dark"] .text-gray-500 { color:rgba(249,247,247,0.75); }
   </style>
 </head>
 <body>
@@ -20,14 +25,14 @@
           <div class="font-bold text-lg">Settings</div>
           <div class="text-sm text-gray-500">User preferences for the dashboard</div>
         </div>
-        <a href="index.html" class="px-3 py-1 rounded bg-gray-100">Back</a>
+        <a href="/" class="px-3 py-1 rounded bg-gray-100 text-gray-900">Back</a>
       </div>
 
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium mb-1">Theme</label>
           <div class="flex items-center gap-3">
-            <button id="light-btn" class="px-3 py-1 rounded bg-gray-100">Light</button>
+            <button id="light-btn" class="px-3 py-1 rounded bg-gray-100 text-gray-900">Light</button>
             <button id="dark-btn" class="px-3 py-1 rounded bg-gray-800 text-white">Dark</button>
           </div>
         </div>
@@ -40,12 +45,16 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { getSavedTheme, applyTheme } from "/js/common.js";
+
+    // Same "fmd_theme" key the dashboard and logs pages read
+    applyTheme(getSavedTheme());
+
     const setThemeValue = (t) => {
-      localStorage.setItem('theme', t);
+      applyTheme(t);
       // Also update main window if this tab was opened from main
-      try { if (window.opener && !window.opener.closed) window.opener.postMessage({ action: 'setTheme', value: t }, '*'); } catch(e){}
-      alert('Theme set to ' + t + '. Return to dashboard for immediate effect.');
+      try { if (window.opener && !window.opener.closed) window.opener.postMessage({ action: 'setTheme', value: t }, window.location.origin); } catch(e){}
     };
     document.getElementById('light-btn').onclick = () => setThemeValue('light');
     document.getElementById('dark-btn').onclick = () => setThemeValue('dark');

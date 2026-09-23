@@ -1,9 +1,18 @@
-const CACHE_NAME = 'ajk-fire-dashboard-v1';
+/**
+ * service-worker.js — PWA offline support
+ * Network-first for same-origin pages and assets; falls back to cache when offline.
+ * Firebase / CDN / API requests are never intercepted so live data is always fresh.
+ */
+const CACHE_NAME = 'ajk-fire-dashboard-v2';
 const ASSETS_TO_CACHE = [
   '/',
-  '/index.html',
+  '/login',
+  '/logs',
+  '/analytics',
   '/manifest.json',
-  '/logo.png'
+  '/assets/logo.png',
+  '/js/firebase-init.js',
+  '/js/common.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -17,19 +26,29 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.map(k => k === CACHE_NAME ? null : caches.delete(k)));
-    self.clients.claim();
+    await self.clients.claim();
   })());
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
+  const url = new URL(event.request.url);
+
+  // Only handle same-origin GET requests; never cache the config API
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
     return;
   }
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(async () => (await caches.match(event.request)) || caches.match('/'))
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (event.request.method === 'GET' && response && response.status === 200) {
+        if (response && response.status === 200 && !response.redirected) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone).catch(()=>{}));
         }
