@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Article — FIRO</title>
+  <meta name="description" content="An article from the FIRO wildfire detection blog." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="blog">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="section-tight">
+      <div class="container">
+        <p style="max-width:820px;margin:10px auto 18px;">
+          <a href="/blog"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All articles</a>
+        </p>
+        <article class="glass article" id="article">
+          <div class="empty"><span class="spinner"></span></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, formatDate, toast } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { loadPost, readingTime } from "/js/blog.js";
+    import { renderMarkdown } from "/js/markdown.js";
+    import { initFirebase } from "/js/firebase-init.js";
+
+    initSite();
+
+    // URL is /blog/<slug> (or /post?slug=<slug>)
+    const params = new URLSearchParams(location.search);
+    const fromPath = location.pathname.match(/^\/blog\/([^/]+)\/?$/);
+    const slug = params.get("slug") || (fromPath ? decodeURIComponent(fromPath[1]) : "");
+
+    let db = null;
+    try { ({ db } = await initFirebase()); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+    const post = await loadPost(db, slug);
+    const el = document.getElementById("article");
+
+    if (!post) {
+      document.title = "Article not found — FIRO";
+      el.innerHTML = `
+        <div class="empty">
+          <i class="fa-solid fa-leaf" aria-hidden="true"></i>
+          <h2>Article not found</h2>
+          <p>It may have been moved or unpublished.</p>
+          <a class="btn btn-leaf" href="/blog">Back to the blog</a>
+        </div>`;
+    } else {
+      document.title = `${post.title} — FIRO`;
+      document.querySelector('meta[name="description"]').setAttribute("content", post.excerpt || post.title);
+      const shareText = encodeURIComponent(`${post.title} ${location.href}`);
+      el.innerHTML = `
+        ${post.cover ? `<img class="article-cover" src="${esc(post.cover)}" alt="" />` : ""}
+        <div class="blog-meta">
+          <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> ${esc(formatDate(post.published_at))}</span>
+          <span>· ${readingTime(post.content)} min read</span>
+          ${post.author ? `<span>· ${esc(post.author)}</span>` : ""}
+        </div>
+        <h1 style="font-size:clamp(1.9rem,4.4vw,2.8rem);">${esc(post.title)}</h1>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;">
+          ${(post.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
+        </div>
+        <div class="prose">${renderMarkdown(post.content)}</div>
+        <hr style="border:none;height:1px;background:var(--jg-border);margin:34px 0 22px;" />
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span class="text-muted">Share:</span>
+          <a class="btn btn-sm" href="https://wa.me/?text=${shareText}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp</a>
+          <button class="btn btn-sm" id="copy-link"><i class="fa-solid fa-link" aria-hidden="true"></i> Copy link</button>
+        </div>`;
+      document.getElementById("copy-link").addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(location.href); toast("Link copied", "success"); }
+        catch { toast("Could not copy the link", "error"); }
+      });
+    }
+  </script>
+</body>
+</html>

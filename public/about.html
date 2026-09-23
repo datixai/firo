@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>About FIRO — Fire Intelligence &amp; Response Observatory</title>
+  <meta name="description" content="FIRO is a final-year project from the University of Kotli, AJK: a low-cost, edge-AI wildfire detection system for the forests of Azad Jammu & Kashmir." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="about">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span class="eyebrow"><i class="fa-solid fa-seedling" aria-hidden="true"></i> About FIRO</span>
+        <h1>Protecting Kashmir's forests with AI</h1>
+        <p>FIRO (Fire Intelligence &amp; Response Observatory) is a low-cost, real-time wildfire detection system built to run on small devices deep in the forest.</p>
+      </div>
+    </section>
+
+    <!-- Mission -->
+    <section class="section-tight">
+      <div class="container grid grid-2" style="align-items:center;">
+        <div class="reveal">
+          <span class="eyebrow">Our mission</span>
+          <h2 style="font-size:clamp(1.7rem,3.2vw,2.3rem);">Early warning that anyone can afford</h2>
+          <p class="text-dim">
+            Forest fires threaten biodiversity, soil, water and livelihoods across northern Pakistan and Azad Jammu &amp; Kashmir.
+            Most of these forests have no active surveillance, and fires are usually reported only once they are visible from settlements.
+          </p>
+          <p class="text-dim">
+            FIRO puts a trained neural network directly on a Raspberry Pi next to a camera. The device recognises fire on its own,
+            sends a tiny alert to the cloud, and gives forest teams the one thing that matters most in a wildfire: <strong>time</strong>.
+          </p>
+        </div>
+        <div class="glass card reveal">
+          <h3><i class="fa-solid fa-bullseye text-fire" aria-hidden="true"></i> Project objectives</h3>
+          <ul class="text-dim" style="padding-left:1.2em;margin:0;display:grid;gap:10px;">
+            <li>Build a real-time, edge-based detection system that captures images with a Raspberry Pi and classifies them on-device, without cloud processing.</li>
+            <li>Achieve reliable detection with high accuracy and low latency for round-the-clock monitoring in changing light.</li>
+            <li>Provide a web dashboard that visualises detections, logs events and supports public fire reporting, sending only compact metadata over the network.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Numbers -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow fire">Why it matters</span>
+          <h2>Fires are becoming more frequent</h2>
+        </div>
+        <div class="grid grid-4">
+          <div class="glass stat reveal"><div class="stat-value fire">2,214</div><div class="stat-label">High-confidence VIIRS fire alerts in Pakistan, Apr 2024 to Apr 2025</div></div>
+          <div class="glass stat reveal"><div class="stat-value fire">1,905</div><div class="stat-label">Alerts in 2024, the highest yearly count on record</div></div>
+          <div class="glass stat reveal"><div class="stat-value">~25 wks</div><div class="stat-label">Length of the fire season, starting mid-December</div></div>
+          <div class="glass stat reveal"><div class="stat-value">8,000+ ha</div><div class="stat-label">Burned in the 2020 Sherani forest fire</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Technology -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow"><i class="fa-solid fa-microchip" aria-hidden="true"></i> Technology</span>
+          <h2>What's inside FIRO</h2>
+        </div>
+        <div class="grid grid-3">
+          <article class="glass card reveal">
+            <div class="icon-badge"><i class="fa-brands fa-raspberry-pi" aria-hidden="true"></i></div>
+            <h3>Edge device</h3>
+            <p>Raspberry Pi 5 with a USB/CSI camera. Captures, preprocesses (224 × 224 RGB) and classifies images locally.</p>
+          </article>
+          <article class="glass card reveal">
+            <div class="icon-badge"><i class="fa-solid fa-brain" aria-hidden="true"></i></div>
+            <h3>MobileNetV2 Lite</h3>
+            <p>Transfer learning from ImageNet, fine-tuned on 6,247 wildfire images, then INT8-quantised with TensorFlow Lite.</p>
+          </article>
+          <article class="glass card reveal">
+            <div class="icon-badge"><i class="fa-solid fa-fire-flame-simple" aria-hidden="true"></i></div>
+            <h3>Firebase cloud</h3>
+            <p>Firestore stores detection events and reports. Firebase Authentication protects the monitoring tools.</p>
+          </article>
+          <article class="glass card reveal">
+            <div class="icon-badge"><i class="fa-solid fa-map" aria-hidden="true"></i></div>
+            <h3>Web dashboard</h3>
+            <p>Live Leaflet map, alert log, analytics and event history, installable on phones as an app (PWA).</p>
+          </article>
+          <article class="glass card reveal">
+            <div class="icon-badge"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
+            <h3>Alerts</h3>
+            <p>One-tap WhatsApp alerts with coordinates, a Google Maps link and time, in English and Urdu.</p>
+          </article>
+          <article class="glass card reveal">
+            <div class="icon-badge fire"><i class="fa-solid fa-people-group" aria-hidden="true"></i></div>
+            <h3>Community reports</h3>
+            <p>A public form lets anyone report smoke or fire with GPS location and a photo.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Journey -->
+    <section class="section">
+      <div class="container" style="max-width:860px;">
+        <div class="section-head reveal">
+          <span class="eyebrow"><i class="fa-solid fa-route" aria-hidden="true"></i> Our journey</span>
+          <h2>From dataset to forest</h2>
+        </div>
+        <div class="timeline">
+          <div class="glass timeline-item reveal">
+            <h4>Research &amp; dataset</h4>
+            <p>Reviewed wildfire detection research and prepared a 6,247-image fire / no-fire dataset from Kaggle.</p>
+          </div>
+          <div class="glass timeline-item reveal">
+            <h4>Model training &amp; comparison</h4>
+            <p>Trained and compared six architectures; MobileNetV2 reached 97.5% test accuracy with only 2.6 M parameters.</p>
+          </div>
+          <div class="glass timeline-item reveal">
+            <h4>Edge deployment</h4>
+            <p>Quantised the model to INT8 TensorFlow Lite and deployed it on a Raspberry Pi 5 with sub-second inference.</p>
+          </div>
+          <div class="glass timeline-item reveal">
+            <h4>Cloud &amp; dashboard</h4>
+            <p>Connected the device to Firebase and built the real-time monitoring dashboard with WhatsApp alerts.</p>
+          </div>
+          <div class="glass timeline-item reveal">
+            <h4>Field testing (Dec 2025 to Jan 2026)</h4>
+            <p>Tested on night-time images of real forest fires near Khuiratta and Nakyal, AJK, with 12 out of 12 detected correctly.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="eyebrow"><i class="fa-solid fa-users" aria-hidden="true"></i> The team</span>
+          <h2>Who built FIRO</h2>
+          <p>A final-year project of the Department of Data Science, Faculty of Computing &amp; Engineering, University of Kotli, Azad Jammu &amp; Kashmir.</p>
+        </div>
+        <div class="grid grid-3">
+          <article class="glass team-card reveal">
+            <div class="avatar fire">AA</div>
+            <h3>Ahmed Ali</h3>
+            <div class="role">Group Leader</div>
+          </article>
+          <article class="glass team-card reveal">
+            <div class="avatar">SI</div>
+            <h3>Seher Ishtiaq</h3>
+            <div class="role">Team Member</div>
+          </article>
+          <article class="glass team-card reveal">
+            <div class="avatar">NA</div>
+            <h3>Mr. Nabeel Ali</h3>
+            <div class="role">Supervisor</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Policy -->
+    <section class="section-tight">
+      <div class="container" style="max-width:900px;">
+        <div class="glass card reveal">
+          <h3><i class="fa-solid fa-scale-balanced text-leaf" aria-hidden="true"></i> Responsible use</h3>
+          <p>
+            FIRO monitors publicly visible forest areas and does not collect personal data from its cameras. Images are processed
+            automatically on the device and used only to detect fire. The system supports early warning and disaster-management
+            authorities. It does not replace human judgement, and every alert should be confirmed before action is taken.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="container">
+        <div class="glass cta-band reveal">
+          <div>
+            <h2>Want to work with us?</h2>
+            <p>Forest departments, researchers and volunteers: we'd love to hear from you.</p>
+          </div>
+          <a class="btn btn-leaf btn-lg" href="/contact"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Get in touch</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite } from "/js/site.js";
+    initSite();
+  </script>
+</body>
+</html>

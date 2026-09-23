@@ -20,6 +20,7 @@ Environment Variables, or in .env.local for local development):
   FIREBASE_STORAGE_BUCKET       (optional)
   FIREBASE_MESSAGING_SENDER_ID  (optional)
   FIRO_WHATSAPP_NUMBER          (optional, international format without "+")
+  FIRO_CONTACT_EMAIL            (optional, shown on the Contact page)
 ─────────────────────────────────────────────────────────────
 """
 
@@ -55,6 +56,7 @@ def build_config(env=None):
     config = {
         "firebase": firebase,
         "whatsappNumber": env.get("FIRO_WHATSAPP_NUMBER", "").strip() or DEFAULT_WHATSAPP_NUMBER,
+        "contactEmail": env.get("FIRO_CONTACT_EMAIL", "").strip(),
     }
     return config, missing
 

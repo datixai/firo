@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+  <style>
+    .admin-bar { position: sticky; top: 0; z-index: 50; background: rgba(2, 13, 8, .88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--jg-border); }
+    .admin-bar .nav { min-height: 64px; }
+    .admin-user { font-size: .85rem; color: var(--jg-text-dim); text-align: right; line-height: 1.3; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 26px 0 22px; }
+    .tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--jg-border); background: rgba(2, 13, 8, .5); color: var(--jg-text-dim); font: 600 .92rem var(--font-body); cursor: pointer; }
+    .tab:hover { color: #fff; border-color: var(--jg-border-strong); }
+    .tab.active { color: #04160e; background: linear-gradient(135deg, #4fd185, #2b8e4e); border-color: transparent; }
+    .tab .count { min-width: 22px; padding: 1px 7px; border-radius: 999px; font-size: .75rem; background: rgba(244, 122, 31, .9); color: #fff; }
+    .tab.active .count { background: rgba(4, 22, 14, .8); }
+    .panel-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .panel-head h2 { margin: 0; font-size: 1.5rem; }
+    .item { padding: 18px 20px; display: grid; gap: 10px; }
+    .item + .item { margin-top: 14px; }
+    .item-top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+    .item-title { font-family: var(--font-head); font-weight: 700; font-size: 1.1rem; color: #fff; }
+    .item-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .86rem; color: var(--jg-text-dim); }
+    .item-meta i { color: var(--jg-muted); margin-right: 4px; }
+    .item-body { color: var(--jg-text); white-space: pre-wrap; word-break: break-word; }
+    .item-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .thumb { width: 120px; height: 90px; object-fit: cover; border-radius: 10px; border: 1px solid var(--jg-border); cursor: zoom-in; }
+    .select-sm { width: auto; padding: 7px 34px 7px 12px; font-size: .85rem; border-radius: 999px; }
+    .overview-list { display: grid; gap: 10px; }
+    .overview-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--jg-border); font-size: .93rem; }
+    .overview-row:last-child { border-bottom: none; }
+    .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 760px) { .editor-grid { grid-template-columns: 1fr; } }
+    .editor-content { min-height: 360px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; }
+    .preview-box { min-height: 360px; max-height: 520px; overflow: auto; padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--jg-border); background: rgba(2, 13, 8, .45); }
+    .cover-preview { max-height: 140px; border-radius: 10px; margin-top: 8px; }
+    .modal.wide { max-width: 1100px; }
+    .gate { max-width: 560px; margin: 80px auto; padding: 34px; text-align: center; }
+    .uid-box { font-family: ui-monospace, Consolas, monospace; padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, .35); border: 1px solid var(--jg-border); word-break: break-all; margin: 12px 0; }
+  </style>
+</head>
+<body class="site">
+  <header class="admin-bar">
+    <nav class="container nav">
+      <a class="brand" href="/admin">
+        <img src="/assets/logo.png" alt="" width="42" height="42" />
+        <span><span class="brand-name">FIRO</span><span class="brand-tag">Admin panel</span></span>
+      </a>
+      <div class="nav-actions">
+        <div class="admin-user" id="admin-user"></div>
+        <a class="btn btn-sm" href="/" target="_blank" rel="noopener" title="View website"><i class="fa-solid fa-globe" aria-hidden="true"></i><span class="btn-dashboard-label"> Website</span></a>
+        <a class="btn btn-sm" href="/dashboard" title="Monitoring dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span class="btn-dashboard-label"> Dashboard</span></a>
+        <button class="btn btn-sm btn-danger" id="logout-btn" hidden><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i><span class="btn-dashboard-label"> Logout</span></button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="container">
+    <!-- Loading -->
+    <div id="state-loading" class="glass gate"><span class="spinner"></span><p class="text-dim" style="margin-top:12px;">Checking access…</p></div>
+
+    <!-- Not an admin -->
+    <div id="state-denied" class="glass gate" hidden>
+      <div class="icon-badge fire" style="margin:0 auto 14px;"><i class="fa-solid fa-lock" aria-hidden="true"></i></div>
+      <h2>Admin access required</h2>
+      <p class="text-dim">You are signed in as <strong id="denied-email"></strong>, but this account is not an admin.</p>
+      <p class="text-dim" style="text-align:left;font-size:.92rem;">
+        To make this account an admin, open <strong>Firebase Console → Firestore Database</strong>, create a collection
+        named <code>admins</code>, and add a document whose <strong>Document ID</strong> is this UID:
+      </p>
+      <div class="uid-box" id="denied-uid"></div>
+      <p style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-sm" id="copy-uid"><i class="fa-solid fa-copy" aria-hidden="true"></i> Copy UID</button>
+        <button class="btn btn-sm" onclick="location.reload()"><i class="fa-solid fa-rotate" aria-hidden="true"></i> Check again</button>
+      </p>
+    </div>
+
+    <!-- Admin panel -->
+    <div id="state-admin" hidden>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="overview" role="tab"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Overview</button>
+        <button class="tab" data-tab="reports" role="tab"><i class="fa-solid fa-fire" aria-hidden="true"></i> Fire reports <span class="count" id="count-reports" hidden></span></button>
+        <button class="tab" data-tab="messages" role="tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Messages <span class="count" id="count-messages" hidden></span></button>
+        <button class="tab" data-tab="blog" role="tab"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</button>
+      </div>
+
+      <!-- Overview -->
+      <section data-panel="overview">
+        <div class="grid grid-4" style="margin-bottom:22px;">
+          <div class="glass stat"><div class="stat-value fire" id="ov-reports">–</div><div class="stat-label">New fire reports</div></div>
+          <div class="glass stat"><div class="stat-value" id="ov-messages">–</div><div class="stat-label">Unread messages</div></div>
+          <div class="glass stat"><div class="stat-value leaf" id="ov-posts">–</div><div class="stat-label">Published posts</div></div>
+          <div class="glass stat"><div class="stat-value fire" id="ov-fires">–</div><div class="stat-label">Active camera fire alerts</div></div>
+        </div>
+        <div class="grid grid-2">
+          <div class="glass card">
+            <div class="panel-head"><h3 style="margin:0;">Latest fire reports</h3><button class="btn btn-sm" data-goto="reports">View all</button></div>
+            <div class="overview-list" id="ov-report-list"></div>
+          </div>
+          <div class="glass card">
+            <div class="panel-head"><h3 style="margin:0;">Latest messages</h3><button class="btn btn-sm" data-goto="messages">View all</button></div>
+            <div class="overview-list" id="ov-message-list"></div>
+          </div>
+        </div>
+        <div class="glass card" style="margin-top:22px;">
+          <h3>Quick links</h3>
+          <div class="item-actions">
+            <a class="btn btn-sm" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Dashboard</a>
+            <a class="btn btn-sm" href="/analytics"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Analytics</a>
+            <a class="btn btn-sm" href="/logs"><i class="fa-solid fa-list" aria-hidden="true"></i> Event logs</a>
+            <a class="btn btn-sm" href="https://console.firebase.google.com/" target="_blank" rel="noopener"><i class="fa-solid fa-fire-flame-simple" aria-hidden="true"></i> Firebase console</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section data-panel="reports" hidden>
+        <div class="panel-head">
+          <h2>Fire reports</h2>
+          <select class="select select-sm" id="report-filter" aria-label="Filter reports">
+            <option value="open">Open (new, reviewing, verified)</option>
+            <option value="">All</option>
+            <option value="new">New</option>
+            <option value="reviewing">Reviewing</option>
+            <option value="verified">Verified fire</option>
+            <option value="resolved">Resolved</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+        </div>
+        <div id="report-list"></div>
+      </section>
+
+      <!-- Messages -->
+      <section data-panel="messages" hidden>
+        <div class="panel-head">
+          <h2>Contact messages</h2>
+          <select class="select select-sm" id="message-filter" aria-label="Filter messages">
+            <option value="unread">Unread</option>
+            <option value="">All</option>
+            <option value="read">Read</option>
+          </select>
+        </div>
+        <div id="message-list"></div>
+      </section>
+
+      <!-- Blog -->
+      <section data-panel="blog" hidden>
+        <div class="panel-head">
+          <h2>Blog posts</h2>
+          <div class="item-actions">
+            <button class="btn btn-sm" id="import-starter"><i class="fa-solid fa-file-import" aria-hidden="true"></i> Import starter posts</button>
+            <button class="btn btn-sm btn-leaf" id="new-post"><i class="fa-solid fa-plus" aria-hidden="true"></i> New post</button>
+          </div>
+        </div>
+        <p class="text-muted" id="blog-note" hidden style="font-size:.9rem;">
+          No posts in Firestore yet, so the website is showing the built-in starter articles.
+          Click <strong>Import starter posts</strong> to copy them here so you can edit them.
+        </p>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Title</th><th>Status</th><th>Date</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="post-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Photo viewer -->
+  <div class="modal-backdrop" id="photo-modal">
+    <div class="glass modal">
+      <div class="modal-head"><h3>Report photo</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <img id="photo-full" alt="Report photo" style="width:100%;border-radius:12px;" />
+    </div>
+  </div>
+
+  <!-- Post editor -->
+  <div class="modal-backdrop" id="editor-modal">
+    <div class="glass modal wide">
+      <div class="modal-head"><h3 id="editor-title">New post</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="post-form">
+        <div class="form-row">
+          <div class="field">
+            <label for="post-title">Title <span class="req">*</span></label>
+            <input class="input" id="post-title" maxlength="160" required />
+          </div>
+          <div class="field">
+            <label for="post-slug">URL slug <span class="req">*</span></label>
+            <input class="input" id="post-slug" maxlength="100" required pattern="[a-z0-9]+(-[a-z0-9]+)*" />
+            <span class="hint">Address: /blog/<span id="slug-preview">…</span></span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="post-excerpt">Short summary <span class="req">*</span></label>
+          <textarea class="textarea" id="post-excerpt" maxlength="300" style="min-height:70px;" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="post-tags">Tags</label>
+            <input class="input" id="post-tags" placeholder="Technology, Research" />
+            <span class="hint">Separate with commas.</span>
+          </div>
+          <div class="field">
+            <label for="post-author">Author</label>
+            <input class="input" id="post-author" maxlength="80" placeholder="FIRO Team" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="post-cover-url">Cover image</label>
+            <input class="input" id="post-cover-url" placeholder="https://… or upload a file" />
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <label class="btn btn-sm" for="post-cover-file"><i class="fa-solid fa-upload" aria-hidden="true"></i> Upload</label>
+              <button type="button" class="btn btn-sm" id="cover-clear">Remove</button>
+            </div>
+            <input type="file" id="post-cover-file" accept="image/*" hidden />
+            <img class="cover-preview" id="cover-preview" alt="" hidden />
+          </div>
+          <div class="field">
+            <label for="post-date">Publish date</label>
+            <input class="input" id="post-date" type="date" />
+            <label class="choice" style="margin-top:10px;width:max-content;"><input type="checkbox" id="post-published" /> <i class="fa-solid fa-eye" aria-hidden="true"></i> Published (visible on the website)</label>
+          </div>
+        </div>
+        <div class="editor-grid">
+          <div class="field">
+            <label for="post-content">Content (Markdown) <span class="req">*</span></label>
+            <textarea class="textarea editor-content" id="post-content" required></textarea>
+            <span class="hint">## Heading · **bold** · *italic* · - list · [link](https://…) · > quote · | tables |</span>
+          </div>
+          <div class="field">
+            <span style="font-weight:600;font-size:.9rem;">Preview</span>
+            <div class="preview-box prose" id="post-preview"></div>
+          </div>
+        </div>
+        <div id="editor-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-post"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save post</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

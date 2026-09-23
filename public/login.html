@@ -4,52 +4,58 @@
   <meta charset="UTF-8" />
   <title>Login | Fire Monitoring</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#1f7a3a" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#04160e" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
 </head>
 
-<body class="min-h-screen flex items-center justify-center bg-gray-100">
+<body class="site" data-page="">
+  <header id="site-header"></header>
 
-  <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+  <main class="auth-wrap">
+    <div class="glass auth-card">
 
-    <!-- Logo -->
-    <div class="flex justify-center mb-4">
-      <img src="/assets/logo.png" alt="FIRO Logo" class="w-20 h-20 rounded" />
+      <!-- Logo -->
+      <img src="/assets/logo.png" alt="FIRO Logo" class="logo" />
+
+      <h2 id="form-title" class="center" style="font-size:1.7rem;">Fire Monitoring Login</h2>
+      <p class="center text-dim" style="margin-top:-4px;">Sign in to open the monitoring dashboard.</p>
+
+      <!-- Loading state while config fetches -->
+      <div id="loading-msg" class="center text-muted" style="margin:18px 0;">
+        <span class="spinner"></span><br />Connecting to server…
+      </div>
+
+      <form id="auth-form" class="form" hidden>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" class="input" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" class="input" placeholder="Min 6 characters" autocomplete="current-password" required />
+        </div>
+
+        <button id="submit-btn" type="submit" class="btn btn-leaf btn-lg btn-block">
+          Login
+        </button>
+      </form>
+
+      <p class="center text-dim" style="margin-top:18px;" id="toggle-row" hidden>
+        <span id="toggle-text">Don't have an account?</span>
+        <button id="toggle-btn" type="button" class="btn btn-sm" style="margin-left:6px;">Sign Up</button>
+      </p>
+
+      <p id="error" class="center" style="color:#ffb3b3;margin:12px 0 0;min-height:1.2em;"></p>
     </div>
-
-    <h2 id="form-title" class="text-2xl font-bold text-center mb-6 text-green-700">
-      Fire Monitoring Login
-    </h2>
-
-    <!-- Loading state while config fetches -->
-    <div id="loading-msg" class="text-center text-gray-400 text-sm mb-4">
-      Connecting to server…
-    </div>
-
-    <form id="auth-form" class="space-y-4 hidden">
-      <input id="email"    type="email"    placeholder="Email"
-             class="w-full px-4 py-2 border rounded" required />
-      <input id="password" type="password" placeholder="Password (min 6 chars)"
-             class="w-full px-4 py-2 border rounded" required />
-
-      <button id="submit-btn" type="submit"
-              class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
-        Login
-      </button>
-    </form>
-
-    <p class="text-center text-sm mt-4 hidden" id="toggle-row">
-      <span id="toggle-text">Don't have an account?</span>
-      <button id="toggle-btn" class="text-green-600 font-semibold ml-1">Sign Up</button>
-    </p>
-
-    <p id="error" class="text-red-500 text-sm mt-3 text-center"></p>
-  </div>
+  </main>
 
   <!-- ── Firebase Auth (config loaded from /api/config) ── -->
   <script type="module">
+    import { initSite } from "/js/site.js";
     import { initFirebase } from "/js/firebase-init.js";
     import {
       setPersistence,
@@ -59,6 +65,8 @@
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+    initSite();
+
     const loadingMsg = document.getElementById("loading-msg");
     const authForm   = document.getElementById("auth-form");
     const toggleRow  = document.getElementById("toggle-row");
@@ -67,6 +75,10 @@
     const toggleBtn  = document.getElementById("toggle-btn");
     const toggleText = document.getElementById("toggle-text");
     const title      = document.getElementById("form-title");
+
+    // Where to go after login: /login?next=/admin → /admin (same-site paths only)
+    const nextParam = new URLSearchParams(window.location.search).get("next") || "";
+    const nextPage  = /^\/(?!\/)[\w\-/]*$/.test(nextParam) ? nextParam : "/dashboard";
 
     let isSignup = false;
 
@@ -80,14 +92,14 @@
       // If already logged in redirect immediately
       onAuthStateChanged(auth, (user) => {
         if (user && !user.isAnonymous) {
-          window.location.replace("/");
+          window.location.replace(nextPage);
         }
       });
 
       // Show form now that Firebase is ready
-      loadingMsg.classList.add("hidden");
-      authForm.classList.remove("hidden");
-      toggleRow.classList.remove("hidden");
+      loadingMsg.hidden = true;
+      authForm.hidden = false;
+      toggleRow.hidden = false;
 
       // ── Form submit ──
       authForm.addEventListener("submit", async (e) => {
@@ -95,15 +107,18 @@
         errorEl.textContent = "";
         const email    = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
+        submitBtn.disabled = true;
         try {
           if (isSignup) {
             await createUserWithEmailAndPassword(auth, email, password);
           } else {
             await signInWithEmailAndPassword(auth, email, password);
           }
-          window.location.replace("/");
+          window.location.replace(nextPage);
         } catch (err) {
           errorEl.textContent = err.message;
+        } finally {
+          submitBtn.disabled = false;
         }
       });
 
@@ -115,13 +130,13 @@
         submitBtn.textContent  = isSignup ? "Sign Up"                 : "Login";
         toggleText.textContent = isSignup ? "Already have an account?" : "Don't have an account?";
         toggleBtn.textContent  = isSignup ? "Login"                   : "Sign Up";
+        document.getElementById("password").autocomplete = isSignup ? "new-password" : "current-password";
       });
 
     } catch (err) {
       // Config fetch failed — /api/config missing or env vars not set
-      loadingMsg.textContent = "⚠️ Cannot load configuration. Check /api/config (see console).";
-      loadingMsg.classList.remove("text-gray-400");
-      loadingMsg.classList.add("text-red-500");
+      loadingMsg.innerHTML = "⚠️ Cannot load configuration. Check /api/config (see console).";
+      loadingMsg.style.color = "#ffb3b3";
       console.error("[FIRO] Firebase init failed:", err);
     }
   </script>

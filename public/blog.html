@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blog — FIRO</title>
+  <meta name="description" content="News, research and field notes from the FIRO wildfire detection project in Azad Jammu & Kashmir." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="blog">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span class="eyebrow"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</span>
+        <h1>Notes from the forest</h1>
+        <p>Research, technology and field updates from the FIRO team.</p>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="container">
+        <div class="glass" style="padding:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:28px;">
+          <div class="choice-group" id="tag-filter" role="radiogroup" aria-label="Filter by topic"></div>
+          <label class="sr-only" for="search">Search articles</label>
+          <input id="search" class="input" type="search" placeholder="Search articles…" style="max-width:280px;" />
+        </div>
+        <div class="grid grid-3" id="posts">
+          <div class="empty"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, initReveal, formatDate } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { loadPublishedPosts, readingTime } from "/js/blog.js";
+    import { initFirebase } from "/js/firebase-init.js";
+
+    initSite();
+
+    let db = null;
+    try { ({ db } = await initFirebase()); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+    const posts = await loadPublishedPosts(db);
+
+    const grid   = document.getElementById("posts");
+    const search = document.getElementById("search");
+    const filter = document.getElementById("tag-filter");
+    let activeTag = "";
+
+    const tags = [...new Set(posts.flatMap((p) => p.tags || []))].sort();
+    filter.innerHTML = ["", ...tags].map((t) => `
+      <label class="choice"><input type="radio" name="tag" value="${esc(t)}" ${t === "" ? "checked" : ""} />${t ? esc(t) : "All"}</label>`).join("");
+
+    function render() {
+      const term = search.value.trim().toLowerCase();
+      const list = posts.filter((p) =>
+        (!activeTag || (p.tags || []).includes(activeTag)) &&
+        (!term || `${p.title} ${p.excerpt} ${(p.tags || []).join(" ")}`.toLowerCase().includes(term)));
+
+      grid.innerHTML = list.map((p) => `
+        <a class="glass blog-card reveal" href="/blog/${encodeURIComponent(p.slug)}">
+          ${p.cover ? `<img class="blog-cover" src="${esc(p.cover)}" alt="" loading="lazy" />`
+                    : `<div class="blog-cover"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></div>`}
+          <div class="blog-body">
+            <div class="blog-meta">
+              <span>${esc(formatDate(p.published_at))}</span>
+              <span>· ${readingTime(p.content)} min read</span>
+            </div>
+            <h3>${esc(p.title)}</h3>
+            <p>${esc(p.excerpt)}</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+              ${(p.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
+            </div>
+            <span class="read-more">Read article <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+          </div>
+        </a>`).join("") || `<div class="empty glass" style="grid-column:1/-1;"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>No articles match your search.</div>`;
+      initReveal(grid);
+    }
+
+    filter.addEventListener("change", (e) => { activeTag = e.target.value; render(); });
+    search.addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>

@@ -16,13 +16,22 @@
  */
 
 import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth }        from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInAnonymously }
+                          from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore }   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const CONFIG_ENDPOINT = "/api/config";
 
 // Firestore collection written by the Raspberry Pi
 export const FIRE_LOGS_COLLECTION = "fire_logs";
+
+// Website collections (top-level)
+export const COLLECTIONS = {
+  reports:  "reports",           // public fire incident reports
+  messages: "contact_messages",  // contact form messages
+  posts:    "blog_posts",        // blog articles (doc id = slug)
+  admins:   "admins",            // doc id = admin user's UID
+};
 
 // ─────────────────────────────────────────────────────────────
 let _firebaseApp   = null;
@@ -75,4 +84,21 @@ export async function initFirebase() {
 /** Path segments of the fire_logs collection: artifacts/{projectId}/public/data/fire_logs */
 export function fireLogsPath(config) {
   return ["artifacts", config.projectId, "public", "data", FIRE_LOGS_COLLECTION];
+}
+
+/**
+ * Resolve with the current user, signing in anonymously if nobody is
+ * signed in. Used by public pages (logs, report, contact) so visitors
+ * can read/write without an account, without replacing a logged-in
+ * officer's session.
+ */
+export function ensureUser(auth) {
+  return new Promise((resolve, reject) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      unsubscribe();
+      if (user) return resolve(user);
+      try { resolve((await signInAnonymously(auth)).user); }
+      catch (err) { reject(err); }
+    });
+  });
 }

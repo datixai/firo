@@ -1,0 +1,110 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// FIRO — Firestore security rules
+//
+// Publish: Firebase Console → Firestore Database → Rules →
+//          paste this file → Publish.
+// (Copy your current rules somewhere first as a backup.)
+//
+// Collections
+//   artifacts/{projectId}/public/data/fire_logs  Raspberry Pi detections
+//   reports           public fire reports      (anyone creates, admins manage)
+//   contact_messages  contact form messages    (anyone creates, admins manage)
+//   blog_posts        blog articles, id = slug (public reads published, admins write)
+//   admins            one doc per admin, id = user UID (created by hand in the console)
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Signed in with email/password (not the anonymous visitor login)
+    function isOfficer() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isText(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    function isOptionalNumber(v) {
+      return v == null || v is number;
+    }
+
+    // ── Raspberry Pi detection logs ──────────────────────────
+    match /artifacts/{projectId}/public/data/fire_logs/{logId} {
+      // Dashboard, analytics and the public logs page (anonymous sign-in)
+      allow read: if signedIn();
+      // The Pi normally writes with the Admin SDK (service account key),
+      // which bypasses these rules. This line covers a client-SDK Pi.
+      allow create: if signedIn();
+      // "Resolved" button on the dashboard
+      allow update: if isOfficer()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['detection_class', 'fire_probability', 'status']);
+      allow delete: if isAdmin();
+    }
+
+    // ── Admin list ───────────────────────────────────────────
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // ── Public fire reports ──────────────────────────────────
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'type', 'place', 'description', 'lat', 'lon', 'accuracy_m',
+             'photo', 'name', 'phone', 'status', 'created_at', 'created_ms'])
+        && request.resource.data.keys().hasAll(['type', 'place', 'status', 'created_at', 'created_ms'])
+        && request.resource.data.type in ['smoke', 'small_fire', 'large_fire', 'near_homes']
+        && isText(request.resource.data.place, 200)
+        && request.resource.data.place.size() > 0
+        && isText(request.resource.data.get('description', ''), 2000)
+        && isOptionalNumber(request.resource.data.get('lat', null))
+        && isOptionalNumber(request.resource.data.get('lon', null))
+        && isOptionalNumber(request.resource.data.get('accuracy_m', null))
+        && isText(request.resource.data.get('photo', ''), 900000)
+        && isText(request.resource.data.get('name', ''), 100)
+        && isText(request.resource.data.get('phone', ''), 30)
+        && request.resource.data.status == 'new'
+        && request.resource.data.created_at == request.time
+        && request.resource.data.created_ms is int;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Contact form messages ────────────────────────────────
+    match /contact_messages/{messageId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'name', 'email', 'subject', 'message', 'status', 'created_at', 'created_ms'])
+        && request.resource.data.keys().hasAll([
+             'name', 'email', 'subject', 'message', 'status', 'created_at', 'created_ms'])
+        && isText(request.resource.data.name, 100)
+        && request.resource.data.name.size() > 0
+        && isText(request.resource.data.email, 200)
+        && isText(request.resource.data.subject, 100)
+        && isText(request.resource.data.message, 3000)
+        && request.resource.data.message.size() > 0
+        && request.resource.data.status == 'unread'
+        && request.resource.data.created_at == request.time
+        && request.resource.data.created_ms is int;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Blog ─────────────────────────────────────────────────
+    match /blog_posts/{slug} {
+      allow read: if isAdmin() || resource.data.published == true;
+      allow write: if isAdmin();
+    }
+  }
+}

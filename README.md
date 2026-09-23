@@ -33,8 +33,9 @@
   - [Dashboard Setup](#1-dashboard-setup)
   - [Raspberry Pi Setup](#2-raspberry-pi-setup)
   - [Firebase Configuration](#3-firebase-configuration)
-  - [Deploying to Vercel](#4-deploying-to-vercel)
-- [Dashboard Pages](#-dashboard-pages)
+  - [Admin Setup](#4-admin-setup)
+  - [Deploying to Vercel](#5-deploying-to-vercel)
+- [Website Pages](#-website-pages)
 - [Edge Device Pipeline](#-edge-device-pipeline)
 - [Results](#-results)
 - [Motivation](#-motivation)
@@ -89,7 +90,7 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     DASHBOARD LAYER                                 │
 │                                                                     │
-│   🌐 Web Dashboard (HTML/JS, hosted on Vercel)                      │
+│   🌐 Website + Dashboard (HTML/JS, hosted on Vercel)                │
 │   ├── Live map with camera locations (Leaflet)                      │
 │   ├── Real-time alert panel (live Firestore listener)               │
 │   ├── Event log history (filterable)                                │
@@ -113,6 +114,9 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 | 🌙 **Dark / Light Mode** | Full theme support across all dashboard pages |
 | 📱 **PWA Ready** | Installable as a mobile app via service worker + manifest |
 | 📊 **Analytics View** | Last-hour analytics panel (`/analytics`) with map, alert panel and recent log table |
+| 🌿 **Public Website** | Home, About, Blog, Report a Fire and Contact pages with an animated night-jungle theme |
+| 🧯 **Public Fire Reporting** | Anyone can report smoke/fire with GPS location, map pin and photo |
+| 🛡️ **Admin Panel** | Hidden `/admin` area to manage fire reports, contact messages and blog posts |
 
 ---
 
@@ -153,37 +157,44 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 ```
 FIRO-FYP/
 │
-├── 📂 public/                       # Web dashboard (deployed by Vercel as-is)
-│   ├── index.html                   # Main monitoring dashboard (live map, alerts)      → /
-│   ├── login.html                   # Firebase Auth login/signup page                  → /login
-│   ├── logs.html                    # Historical fire event log page                   → /logs
-│   ├── analytics.html               # Last-hour analytics panel (replaces Dash app)    → /analytics
-│   ├── settings.html                # User preferences (theme)                         → /settings
+├── 📂 public/                       # Everything Vercel serves (website + dashboard)
+│   ├── index.html                   # Home page                                   → /
+│   ├── about.html                   # About the project and team                  → /about
+│   ├── blog.html                    # Blog list                                   → /blog
+│   ├── post.html                    # Single article                              → /blog/<slug>
+│   ├── report.html                  # Public "Report a Fire" form                 → /report
+│   ├── contact.html                 # Contact form                                → /contact
+│   ├── admin.html                   # Hidden admin panel (not linked anywhere)    → /admin
+│   ├── 404.html                     # "Lost in the jungle" page
+│   ├── dashboard.html               # Monitoring dashboard (live map, alerts)     → /dashboard
+│   ├── login.html                   # Firebase Auth login/signup                  → /login
+│   ├── logs.html                    # Historical fire event log                   → /logs
+│   ├── analytics.html               # Last-hour analytics panel                   → /analytics
+│   ├── settings.html                # Dashboard theme preference                  → /settings
+│   ├── css/site.css                 # Website design system + jungle theme
 │   ├── js/
-│   │   ├── firebase-init.js         # Loads config from /api/config, initialises Firebase
-│   │   └── common.js                # Shared helpers (escaping, fire status, coords, theme)
-│   ├── assets/logo.png              # FIRO / university logo
-│   ├── manifest.json                # PWA web app manifest
-│   └── service-worker.js            # PWA offline caching
+│   │   ├── site.js                  # Nav bar, footer, toasts, scroll animations
+│   │   ├── jungle-bg.js             # Animated night-jungle background (canvas)
+│   │   ├── firebase-init.js         # Loads /api/config, initialises Firebase
+│   │   ├── common.js                # Shared helpers (escaping, fire status, coords, theme)
+│   │   ├── admin.js                 # Admin panel logic
+│   │   ├── blog.js / blog-data.js   # Blog loading + built-in starter articles
+│   │   ├── markdown.js              # Safe Markdown rendering for posts
+│   │   └── image-utils.js           # In-browser photo compression
+│   ├── assets/logo.png
+│   ├── manifest.json, service-worker.js, robots.txt
 │
-├── 📂 api/
-│   └── config.py                    # Vercel serverless function → GET /api/config
-│
-├── 📂 scripts/
-│   └── dev_server.py                # Local preview server (same routes as Vercel)
-│
-├── 📂 models/
-│   └── mobilenetv2_fire_detection.tflite   # INT8 quantized TFLite model
-│
+├── 📂 api/config.py                 # Vercel serverless function → GET /api/config
+├── 📂 scripts/dev_server.py         # Local preview server (same routes as Vercel)
+├── 📂 models/                       # INT8 quantized TFLite model
 ├── 📂 docs/                         # FYP thesis (PDF)
 ├── 📂 secrets/                      # ⚠️ Local only, gitignored: service_account_key.json
 ├── 📂 raspberry-pi/                 # Edge device inference code (to be added)
 │
-├── vercel.json                      # Vercel config (output dir, clean URLs, headers)
-├── .vercelignore                    # Keeps models/docs/secrets out of deployments
-├── .env.example                     # Template for .env.local / Vercel env vars
-├── .gitignore                       # Ignores secrets, venvs, IDE files
-└── README.md                        # You are here
+├── firestore.rules                  # Firestore security rules (publish in Firebase console)
+├── vercel.json                      # Vercel config (output dir, clean URLs, rewrites, headers)
+├── .vercelignore, .env.example, .gitignore
+└── README.md
 ```
 
 > **Note:** The `raspberry-pi/` folder will hold the on-device code that runs the inference loop on Raspberry Pi 5. Both codebases share the same Firebase project.
@@ -259,8 +270,8 @@ python scripts/dev_server.py
 ```
 
 The local server mirrors Vercel: pages are served from `public/` with clean URLs
-(`/login`, `/logs`, `/analytics`, `/settings`) and `/api/config` runs the same code as
-the Vercel function in `api/config.py`.
+(`/about`, `/report`, `/dashboard`, `/admin`, …), `/blog/<slug>` opens an article, and
+`/api/config` runs the same code as the Vercel function in `api/config.py`.
 
 ---
 
@@ -305,6 +316,10 @@ The script will:
 5. Detection logs live at `artifacts/{projectId}/public/data/fire_logs`
 6. Download **Service Account Key** (Project Settings → Service Accounts → Generate New Private Key) for the Raspberry Pi
 7. **⚠️ Never commit this file** — keep it in `secrets/` (gitignored)
+8. **Publish the security rules:** Firestore Database → **Rules** → paste the contents of
+   [`firestore.rules`](firestore.rules) → **Publish**. Back up your current rules first.
+   The rules let visitors submit reports and messages, keep them readable only by admins,
+   and keep the dashboard working.
 
 **Firestore document structure** (written by Raspberry Pi):
 ```json
@@ -326,7 +341,25 @@ The script will:
 
 ---
 
-### 4. Deploying to Vercel
+### 4. Admin Setup
+
+The admin panel lives at **`/admin`**. It is not linked from the website and is hidden from search engines.
+
+1. Create an account at `/login` (or use your existing one) and open `/admin`.
+2. The page shows **"Admin access required"** with your account's **UID**. Click **Copy UID**.
+3. Firebase Console → Firestore Database → **Start collection** → Collection ID `admins` →
+   Document ID = *your UID* → add a field `email` (string) with your email → **Save**.
+4. Click **Check again** on `/admin`. You now have access to:
+   - **Fire reports:** view location, photo and contact, set status (new → reviewing → verified → resolved / dismissed), forward on WhatsApp, delete
+   - **Messages:** read, reply by email, mark read/unread, delete
+   - **Blog:** write posts in Markdown with live preview, cover images, drafts, publish/unpublish,
+     and **Import starter posts** to make the three built-in articles editable
+
+Repeat step 3 for every person who should be an admin.
+
+---
+
+### 5. Deploying to Vercel
 
 1. Push this repo to GitHub.
 2. In Vercel: **Add New → Project → Import** `FIRO-FYP`.
@@ -334,9 +367,10 @@ The script will:
      `vercel.json` already sets the output directory to `public`).
 3. Add these **Environment Variables** (Production, Preview and Development):
    `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`,
-   `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, and optionally `FIRO_WHATSAPP_NUMBER`.
+   `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, and optionally `FIRO_WHATSAPP_NUMBER`
+   and `FIRO_CONTACT_EMAIL` (shown on the Contact page).
 4. **Deploy.** Open `https://<your-project>.vercel.app/api/config` to confirm the config
-   loads, then `/login` to sign in.
+   loads, then visit the home page, `/login` and `/admin`.
 
 Only public Firebase web settings are sent to Vercel. The service-account private key is
 never uploaded; data access is protected by Firebase Authentication and your Firestore
@@ -344,34 +378,34 @@ security rules.
 
 ---
 
-## 🖥️ Dashboard Pages
+## 🖥️ Website Pages
 
-### Login Screen (`/login`)
-Firebase-authenticated login/signup. Session expires on browser close (session persistence).  
-**File:** `public/login.html`
+The whole site uses an animated **night-jungle theme**: moonlit sky, layered canopy, palms,
+hanging vines, drifting mist, fireflies and rising embers, drawn in code (no image files)
+and paused for visitors who prefer reduced motion.
 
-### Main Dashboard (`/`)
-- **Live Leaflet map** — colour-coded markers (🔴 Fire / 🟢 Safe) at each camera location
-- **Live fire alert log** — active fires first, with **Send** (WhatsApp) and **Resolved** actions
-- **Stats cards** — active fires, total cameras, latest detection time
-- **Real-time updates** — live Firestore listener, no page refresh needed
-- **Dark / Light mode** toggle and fullscreen in the settings sidebar
+### Public website
+| Page | URL | What it does |
+|---|---|---|
+| Home | `/` | Hero, the problem, how FIRO works, features, model results, latest blog posts |
+| About | `/about` | Mission, objectives, statistics, technology, project journey, team |
+| Blog | `/blog`, `/blog/<slug>` | Articles with topic filter and search; posts are managed in the admin panel |
+| Report a Fire | `/report` | Public form: what they see, GPS / map pin, place, details, photo, contact; optional WhatsApp forward |
+| Contact | `/contact` | Contact form (saved for admins) plus WhatsApp / email / university details |
 
-### Fire Event Log (`/logs`)
-- Full history of all detection events from Firebase
-- Filter by camera and by Fire / Safe / All
-- Each entry shows: timestamp, location, confidence score, classification
-- Viewable with the link (anonymous sign-in); dark mode supported
+### Monitoring dashboard (for officers, opened from the **Dashboard** button)
+| Page | URL | What it does |
+|---|---|---|
+| Login | `/login` | Firebase email/password login; session ends when the tab closes |
+| Dashboard | `/dashboard` | Live Leaflet map, active fires, alert log with **Send** (WhatsApp) and **Resolved** |
+| Event log | `/logs` | Full history with camera and fire/safe filters (viewable with the link) |
+| Analytics | `/analytics` | Last-hour view: map, alert panel, recent readings |
+| Settings | `/settings` | Light / dark theme for the dashboard pages |
 
-### Analytics (`/analytics`)
-- Last-hour view of the latest reading per camera (replaces the old Python Dash `app.py`)
-- Dark map with markers sized by fire probability
-- Alert panel that pulses red when a camera reports fire
-- Recent log table with red highlighting for fire events
-
-### Settings (`/settings`)
-- Theme preference (Light / Dark), shared with all pages
-- More options in development (alert thresholds, notification recipients)
+### Admin (hidden)
+| Page | URL | What it does |
+|---|---|---|
+| Admin panel | `/admin` | Overview, fire reports, contact messages and blog management (see [Admin Setup](#4-admin-setup)) |
 
 ---
 

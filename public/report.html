@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Report a Fire — FIRO</title>
+  <meta name="description" content="Seen smoke or fire in the forest? Report it to the FIRO response team with your location and a photo." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="report">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span class="eyebrow fire"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</span>
+        <h1>Seen smoke or fire?</h1>
+        <p>Tell us where. Your report goes straight to the FIRO response team.</p>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="container" style="max-width:860px;">
+        <div class="alert alert-fire reveal" style="margin-bottom:22px;">
+          <i class="fa-solid fa-triangle-exclamation text-fire" aria-hidden="true"></i>
+          <div><strong>If anyone is in danger, call <a href="tel:1122">Rescue 1122</a> first.</strong>
+            Move away from the fire and never try to fight a large fire yourself.</div>
+        </div>
+
+        <!-- Form -->
+        <div class="glass card reveal" id="form-card">
+          <form class="form" id="report-form" novalidate>
+            <div class="field">
+              <span style="font-weight:600;font-size:.9rem;">What do you see? <span class="req">*</span></span>
+              <div class="choice-group" role="radiogroup" aria-label="What do you see">
+                <label class="choice"><input type="radio" name="type" value="smoke" required /> <i class="fa-solid fa-smog" aria-hidden="true"></i> Smoke</label>
+                <label class="choice"><input type="radio" name="type" value="small_fire" /> <i class="fa-solid fa-fire-flame-simple" aria-hidden="true"></i> Small fire</label>
+                <label class="choice"><input type="radio" name="type" value="large_fire" /> <i class="fa-solid fa-fire" aria-hidden="true"></i> Large fire</label>
+                <label class="choice"><input type="radio" name="type" value="near_homes" /> <i class="fa-solid fa-house-fire" aria-hidden="true"></i> Fire near homes</label>
+              </div>
+            </div>
+
+            <div class="field">
+              <span style="font-weight:600;font-size:.9rem;">Location on the map</span>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="btn btn-sm btn-leaf" id="locate-btn">
+                  <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Use my current location
+                </button>
+                <span class="hint" id="coords-label">Or tap the map where you saw the fire.</span>
+              </div>
+              <div id="map" class="map-picker" aria-label="Map: tap to mark the fire location"></div>
+            </div>
+
+            <div class="field">
+              <label for="place">Place / landmark <span class="req">*</span></label>
+              <input class="input" id="place" maxlength="200" required placeholder="e.g. Hill behind Kurti village, near the water tank" />
+            </div>
+
+            <div class="field">
+              <label for="description">Details</label>
+              <textarea class="textarea" id="description" maxlength="2000" placeholder="How big is it? Which direction is it spreading? Anyone nearby?"></textarea>
+            </div>
+
+            <div class="field">
+              <span style="font-weight:600;font-size:.9rem;">Photo (optional)</span>
+              <label class="file-drop" id="drop" for="photo">
+                <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                <span><strong>Take or choose a photo</strong><br /><span class="hint">JPG or PNG. It will be resized automatically.</span></span>
+              </label>
+              <input id="photo" type="file" accept="image/*" capture="environment" hidden />
+              <div class="photo-preview" id="preview">
+                <img alt="Selected photo" id="preview-img" />
+                <button type="button" class="btn btn-sm btn-danger" id="remove-photo"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Remove</button>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label for="name">Your name</label>
+                <input class="input" id="name" maxlength="100" autocomplete="name" />
+              </div>
+              <div class="field">
+                <label for="phone">Phone number</label>
+                <input class="input" id="phone" type="tel" maxlength="30" autocomplete="tel" placeholder="03xx xxxxxxx" />
+                <span class="hint">So the team can call you for directions.</span>
+              </div>
+            </div>
+
+            <div class="honeypot" aria-hidden="true">
+              <label for="website">Website</label>
+              <input id="website" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <div id="form-status"></div>
+            <button class="btn btn-fire btn-lg" type="submit" id="submit-btn">
+              <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send report
+            </button>
+          </form>
+        </div>
+
+        <!-- Success -->
+        <div class="glass card center" id="success-card" hidden>
+          <div class="icon-badge" style="margin:0 auto 16px;width:64px;height:64px;font-size:1.6rem;"><i class="fa-solid fa-check" aria-hidden="true"></i></div>
+          <h2>Report received</h2>
+          <p class="text-dim">Thank you. The response team has your report.<br />Reference: <strong id="ref-id"></strong></p>
+          <div class="hero-actions" style="justify-content:center;">
+            <a class="btn btn-leaf" id="whatsapp-btn" target="_blank" rel="noopener" hidden>
+              <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Also send on WhatsApp
+            </a>
+            <a class="btn" href="tel:1122"><i class="fa-solid fa-phone" aria-hidden="true"></i> Call 1122</a>
+            <button class="btn" id="another-btn"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Report another</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { initSite, toast } from "/js/site.js";
+    import { initFirebase, ensureUser, COLLECTIONS } from "/js/firebase-init.js";
+    import { compressImage } from "/js/image-utils.js";
+    import { collection, addDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    initSite();
+
+    const TYPE_LABELS = { smoke: "Smoke", small_fire: "Small fire", large_fire: "Large fire", near_homes: "Fire near homes" };
+    const RATE_KEY = "firo_report_sent_at";
+
+    const form     = document.getElementById("report-form");
+    const statusEl = document.getElementById("form-status");
+    const submit   = document.getElementById("submit-btn");
+    const coordsEl = document.getElementById("coords-label");
+
+    let firebase = null;
+    try { firebase = await initFirebase(); }
+    catch (err) {
+      console.error(err);
+      statusEl.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>Online reporting is temporarily unavailable. Please call <a href="tel:1122">1122</a>.</div></div>`;
+      submit.disabled = true;
+    }
+
+    // ── Map picker ──
+    const picked = { lat: null, lon: null, accuracy: null };
+    const map = L.map("map", { scrollWheelZoom: false }).setView([33.52, 73.9], 10);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles © Esri", maxZoom: 19 }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19 }).addTo(map);
+    let marker = null;
+
+    function setLocation(lat, lon, accuracy = null, zoom = false) {
+      picked.lat = Number(lat.toFixed(6));
+      picked.lon = Number(lon.toFixed(6));
+      picked.accuracy = accuracy ? Math.round(accuracy) : null;
+      if (!marker) {
+        marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+        marker.on("dragend", () => { const p = marker.getLatLng(); setLocation(p.lat, p.lng); });
+      } else {
+        marker.setLatLng([lat, lon]);
+      }
+      if (zoom) map.setView([lat, lon], 15);
+      coordsEl.innerHTML = `<i class="fa-solid fa-location-dot text-fire"></i> ${picked.lat}, ${picked.lon}` +
+        (picked.accuracy ? ` (±${picked.accuracy} m)` : "") + " · drag the pin to adjust";
+    }
+    map.on("click", (e) => setLocation(e.latlng.lat, e.latlng.lng));
+
+    document.getElementById("locate-btn").addEventListener("click", () => {
+      if (!navigator.geolocation) return toast("Location is not supported on this device", "error");
+      coordsEl.textContent = "Finding your location…";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+        () => { coordsEl.textContent = "Could not get your location. Tap the map instead."; toast("Location permission denied", "error"); },
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    });
+
+    // ── Photo ──
+    let photoData = "";
+    const photoInput = document.getElementById("photo");
+    const drop = document.getElementById("drop");
+    const preview = document.getElementById("preview");
+
+    async function handleFile(file) {
+      if (!file) return;
+      try {
+        photoData = await compressImage(file);
+        document.getElementById("preview-img").src = photoData;
+        preview.classList.add("show");
+        drop.style.display = "none";
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    }
+    photoInput.addEventListener("change", () => handleFile(photoInput.files[0]));
+    ["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("drag")));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
+    document.getElementById("remove-photo").addEventListener("click", () => {
+      photoData = ""; photoInput.value = "";
+      preview.classList.remove("show"); drop.style.display = "";
+    });
+
+    // ── Submit ──
+    function showError(msg) {
+      statusEl.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><div>${msg}</div></div>`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      statusEl.innerHTML = "";
+      const val = (id) => document.getElementById(id).value.trim();
+      if (val("website")) return;  // bot
+
+      const type = form.querySelector('input[name="type"]:checked')?.value;
+      if (!type) return showError("Please choose what you see.");
+      if (!val("place")) return showError("Please describe the place or a nearby landmark.");
+
+      let last = 0;
+      try { last = Number(localStorage.getItem(RATE_KEY)) || 0; } catch {}
+      if (Date.now() - last < 60_000) return showError("You just sent a report. Please wait a minute before sending another, or call 1122.");
+
+      const report = {
+        type,
+        place: val("place"),
+        description: val("description"),
+        lat: picked.lat,
+        lon: picked.lon,
+        accuracy_m: picked.accuracy,
+        photo: photoData,
+        name: val("name"),
+        phone: val("phone"),
+        status: "new",
+        created_at: serverTimestamp(),
+        created_ms: Date.now(),
+      };
+
+      submit.disabled = true;
+      submit.innerHTML = `<span class="spinner" style="width:18px;height:18px;"></span> Sending…`;
+      try {
+        await ensureUser(firebase.auth);
+        const ref = await addDoc(collection(firebase.db, COLLECTIONS.reports), report);
+        try { localStorage.setItem(RATE_KEY, String(Date.now())); } catch {}
+
+        const refId = ref.id.slice(0, 8).toUpperCase();
+        document.getElementById("ref-id").textContent = refId;
+
+        const number = firebase.settings.whatsappNumber;
+        if (number) {
+          const lines = [
+            `🔥 Fire report (${TYPE_LABELS[type]}) — Ref ${refId}`,
+            `Place: ${report.place}`,
+            report.lat != null ? `Map: https://www.google.com/maps?q=${report.lat},${report.lon}` : "",
+            report.description ? `Details: ${report.description}` : "",
+            report.name || report.phone ? `Reported by: ${[report.name, report.phone].filter(Boolean).join(", ")}` : "",
+            "",
+            "🔥 آگ لگی ہوئی ہے — براہ کرم فوری کارروائی کریں۔",
+          ].filter((l, i, a) => l !== "" || a[i - 1] !== "");
+          const btn = document.getElementById("whatsapp-btn");
+          btn.href = `https://wa.me/${number}?text=${encodeURIComponent(lines.join("\n"))}`;
+          btn.hidden = false;
+        }
+
+        document.getElementById("form-card").hidden = true;
+        document.getElementById("success-card").hidden = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) {
+        console.error("[FIRO] Report failed:", err);
+        showError("Sorry, the report could not be sent. Please try again, or call <a href=\"tel:1122\">1122</a>.");
+      } finally {
+        submit.disabled = false;
+        submit.innerHTML = `<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send report`;
+      }
+    });
+
+    document.getElementById("another-btn").addEventListener("click", () => {
+      form.reset();
+      document.getElementById("remove-photo").click();
+      document.getElementById("success-card").hidden = true;
+      document.getElementById("form-card").hidden = false;
+    });
+  </script>
+</body>
+</html>

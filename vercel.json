@@ -26,6 +26,12 @@
       "permanent": true
     }
   ],
+  "rewrites": [
+    {
+      "source": "/blog/:slug",
+      "destination": "/post"
+    }
+  ],
   "headers": [
     {
       "source": "/service-worker.js",
@@ -46,6 +52,15 @@
         {
           "key": "Cache-Control",
           "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/(admin|login|dashboard|analytics|settings)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     },

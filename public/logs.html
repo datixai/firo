@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Fire Logs</title>
+  <title>Fire Logs — FIRO</title>
   <meta name="theme-color" content="#1f7a3a" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
@@ -57,7 +57,7 @@
       </div>
       <div class="flex items-center gap-4">
         <div id="current-time" class="text-sm font-medium text-gray-600">--</div>
-        <a href="/" class="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200">← Back</a>
+        <a href="/dashboard" class="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200">← Dashboard</a>
       </div>
     </div>
 
@@ -83,11 +83,9 @@
   </div>
 
   <script type="module">
-    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
+    import { initFirebase, fireLogsPath, ensureUser } from "/js/firebase-init.js";
     import { esc, isFireClass, isActiveFire, isResolved, getLatLon, formatTime,
              getSavedTheme, applyTheme, startClock } from "/js/common.js";
-    import { signInAnonymously, onAuthStateChanged }
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, onSnapshot, orderBy, query }
       from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -112,16 +110,8 @@
 
     // Logs page is viewable by anyone with the link: reuse the logged-in
     // session if there is one, otherwise sign in anonymously.
-    await new Promise((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        unsubscribe();
-        if (!user) {
-          try { await signInAnonymously(auth); }
-          catch (err) { console.error("[FIRO] Anonymous sign-in failed:", err); }
-        }
-        resolve();
-      });
-    });
+    try { await ensureUser(auth); }
+    catch (err) { console.error("[FIRO] Anonymous sign-in failed:", err); }
 
     const q = query(collection(db, ...fireLogsPath(config)), orderBy("timestamp_ms", "desc"));
 

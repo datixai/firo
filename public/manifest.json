@@ -2,7 +2,7 @@
   "name": "AJK Fire Monitoring",
   "short_name": "AJK Fire",
   "description": "Realtime wildfire monitoring dashboard for AJK Fire Monitoring Department.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",

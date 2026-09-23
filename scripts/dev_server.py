@@ -5,6 +5,7 @@ Local preview server that behaves like the Vercel deployment:
 
   • serves the static site from  public/
   • clean URLs:  /login → public/login.html,  /login.html → 308 /login
+  • /blog/<slug> → public/post.html, unknown pages → public/404.html
   • GET /api/config  → same code as the Vercel function (api/config.py)
 
 No pip install needed (standard library only).
@@ -25,6 +26,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
@@ -116,6 +118,11 @@ class DevHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        # Rewrites from vercel.json: /blog/<slug> → public/post.html
+        if re.fullmatch(r"/blog/[^/]+", path):
+            self.path = "/post.html"
+            return super().do_GET()
+
         # /page → public/page.html
         if path != "/" and "." not in os.path.basename(path):
             candidate = os.path.join(PUBLIC_DIR, path.lstrip("/") + ".html")
@@ -123,6 +130,21 @@ class DevHandler(SimpleHTTPRequestHandler):
                 self.path = path + ".html"
 
         super().do_GET()
+
+    def send_error(self, code, message=None, explain=None):
+        # Serve public/404.html for unknown pages, like Vercel does
+        page = os.path.join(PUBLIC_DIR, "404.html")
+        if code == 404 and os.path.isfile(page):
+            with open(page, "rb") as f:
+                body = f.read()
+            self.send_response(404)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            return
+        super().send_error(code, message, explain)
 
 
 def main():
