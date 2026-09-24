@@ -16,6 +16,16 @@ import { collection, query, where, getDocs, doc, getDoc }
 
 const byNewest = (a, b) => (b.published_at || 0) - (a.published_at || 0);
 
+/**
+ * Articles copied into Firestore before cover photos existed have no cover.
+ * Give them the photo of the matching built-in article.
+ */
+function withCover(post) {
+  if (post.cover) return post;
+  const sp = STARTER_POSTS.find((s) => s.slug === post.slug || s.replaces === post.slug);
+  return sp?.cover ? { ...post, cover: sp.cover } : post;
+}
+
 /** True once the admin panel manages the posts (so deleted starter posts stay deleted). */
 let managedPromise = null;
 function postsManaged(db) {
@@ -33,7 +43,7 @@ export async function loadPublishedPosts(db) {
     try {
       const q = query(collection(db, COLLECTIONS.posts), where("published", "==", true));
       const snap = await getDocs(q);
-      if (!snap.empty) return snap.docs.map((d) => ({ slug: d.id, ...d.data() })).sort(byNewest);
+      if (!snap.empty) return snap.docs.map((d) => withCover({ slug: d.id, ...d.data() })).sort(byNewest);
       if (await postsManaged(db)) return [];
     } catch (err) {
       console.warn("[FIRO] Could not load blog posts from Firestore, showing starter posts.", err);
@@ -48,7 +58,7 @@ export async function loadPost(db, slug) {
   if (db) {
     try {
       const snap = await getDoc(doc(db, COLLECTIONS.posts, slug));
-      if (snap.exists() && snap.data().published) return { slug: snap.id, ...snap.data() };
+      if (snap.exists() && snap.data().published) return withCover({ slug: snap.id, ...snap.data() });
     } catch (err) {
       // Firestore denies reading drafts and deleted posts
       console.warn("[FIRO] Could not load post from Firestore.", err);

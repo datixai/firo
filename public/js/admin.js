@@ -198,7 +198,7 @@ onSnapshot(collection(db, COLLECTIONS.posts), (snap) => {
   posts = snap.docs.map((d) => ({ slug: d.id, ...d.data() }))
     .sort((a, b) => (b.published_at || 0) - (a.published_at || 0));
   renderPosts();
-  if (!blogChecked) { blogChecked = true; takeOverBlog(); }
+  if (!blogChecked) { blogChecked = true; takeOverBlog().then(autoUpdateStarters); }
 }, listenerError("blog posts"));
 
 /**
@@ -235,6 +235,28 @@ function starterDoc(sp, keep = {}) {
 function starterUpdates() {
   return STARTER_POSTS.map((sp) => ({ sp, cur: posts.find((p) => p.slug === sp.slug) || posts.find((p) => sp.replaces && p.slug === sp.replaces) }))
     .filter(({ sp, cur }) => cur && (cur.starter_rev || 1) < (sp.rev || 1));
+}
+
+/**
+ * Built-in articles nobody has edited here are brought up to date on their own
+ * (new text and cover photo). Edited ones are only offered in the banner.
+ */
+async function autoUpdateStarters() {
+  const list = starterUpdates().filter(({ cur }) => !cur.admin_edited);
+  if (!list.length) return;
+  try {
+    const batch = writeBatch(db);
+    for (const { sp, cur } of list) {
+      batch.set(doc(db, COLLECTIONS.posts, sp.slug), starterDoc(sp, {
+        published: cur.published !== false, published_at: cur.published_at || sp.published_at,
+      }));
+      if (cur.slug !== sp.slug) batch.delete(doc(db, COLLECTIONS.posts, cur.slug));
+    }
+    await batch.commit();
+    toast(`${list.length} built-in article${list.length > 1 ? "s were" : " was"} updated with the new text and cover photo.`, "info", 7000);
+  } catch (err) {
+    console.error("[FIRO] Could not update built-in articles:", err);
+  }
 }
 
 function renderStarterUpdate() {
@@ -384,6 +406,7 @@ $("post-form").addEventListener("submit", async (e) => {
     published: $("post-published").checked,
     published_at: new Date($("post-date").value || Date.now()).getTime(),
     updated_ms: Date.now(),
+    admin_edited: true,
   };
 
   // Keep the built-in article revision, so "Updated built-in articles" is not offered again
