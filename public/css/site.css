@@ -1057,3 +1057,11 @@ h3 { font-weight: 600; }
 .use-top span { color: var(--jg-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .use-meta { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: .85rem; color: var(--jg-muted); }
 .use-list p { margin: 8px 0 0; color: var(--jg-text-dim); font-size: .95rem; }
+
+/* Public header: logo left, links centred, menu button right */
+.site-header .nav { display: grid; grid-template-columns: 1fr auto 1fr; }
+.site-header .nav-actions { grid-column: 3; justify-self: end; }
+@media (max-width: 960px) {
+  .site-header .nav-links { background: #04140d; }
+  .site-header .nav-links a { display: flex; width: 100%; }
+}

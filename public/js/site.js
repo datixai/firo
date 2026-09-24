@@ -46,9 +46,6 @@ function renderHeader(activePage) {
             ${esc(l.label)}</a></li>`).join("")}
       </ul>
       <div class="nav-actions">
-        <a class="nav-profile" href="/dashboard" title="Dashboard" aria-label="Open the monitoring dashboard">
-          <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-        </a>
         <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
           <i class="fa-solid fa-bars" aria-hidden="true"></i>
         </button>
@@ -96,7 +93,6 @@ function renderFooter() {
           <h4 data-edit="col2">Act</h4>
           <ul>
             <li><a href="/report">Report a fire</a></li>
-            <li><a href="/dashboard">Monitoring dashboard</a></li>
             <li><a href="/logs">Public event log</a></li>
           </ul>
         </div>
