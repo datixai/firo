@@ -78,6 +78,10 @@ function renderFooter() {
           </a>
           <p data-edit="about">Edge-AI wildfire detection for the forests of Azad Jammu &amp; Kashmir.
              Cameras with on-device AI spot fire on-site and alert the Forest Department in seconds.</p>
+          <div class="footer-flags">
+            <span class="footer-flag"><img src="/assets/flags/ajk.jpg" alt="Flag of Azad Jammu and Kashmir" width="30" height="20" loading="lazy" />Azad Jammu Kashmir</span>
+            <span class="footer-flag"><img src="/assets/flags/pakistan.svg" alt="Flag of Pakistan" width="30" height="20" loading="lazy" />Pakistan</span>
+          </div>
         </div>
         <div>
           <h4 data-edit="col1">Explore</h4>

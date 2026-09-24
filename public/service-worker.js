@@ -3,7 +3,7 @@
  * Network-first for same-origin pages and assets; falls back to cache when offline.
  * Firebase / CDN / API requests are never intercepted so live data is always fresh.
  */
-const CACHE_NAME = 'firo-site-v13';
+const CACHE_NAME = 'firo-site-v15';
 const ASSETS_TO_CACHE = [
   '/',
   '/dashboard',

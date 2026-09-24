@@ -1065,3 +1065,11 @@ h3 { font-weight: 600; }
   .site-header .nav-links { background: #04140d; }
   .site-header .nav-links a { display: flex; width: 100%; }
 }
+
+/* ── Footer flags ─────────────────────────────────────────── */
+.footer-flags { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 20px; }
+.footer-flag {
+  display: inline-flex; align-items: center; gap: 9px;
+  color: var(--jg-text-dim); font-size: .8rem; font-weight: 500;
+}
+.footer-flag img { width: 30px; height: 20px; object-fit: cover; }
