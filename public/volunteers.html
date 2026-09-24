@@ -92,6 +92,8 @@
               <label for="website">Website</label>
               <input id="website" tabindex="-1" autocomplete="off" />
             </div>
+            <label class="terms-check"><input type="checkbox" id="agree" required />
+              <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
             <div id="form-status"></div>
             <button class="btn btn-fire btn-lg" type="submit" id="submit-btn">
               <i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Send application
@@ -181,6 +183,8 @@
       if (Object.values(data).some((v) => !v)) return showStatus("error", "Please fill in every field.");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return showStatus("error", "Please enter a valid email address.");
       if (!/^[+\d][\d\s()-]{6,}$/.test(data.phone)) return showStatus("error", "Please enter a valid phone number.");
+
+      if (!$("agree").checked) return showStatus("error", "Please accept the Terms and Privacy Policy to send your application.");
 
       let last = 0;
       try { last = Number(localStorage.getItem(RATE_KEY)) || 0; } catch {}

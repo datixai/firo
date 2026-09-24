@@ -111,7 +111,12 @@ function renderFooter() {
         </div>
       </div>
       <div class="footer-bottom">
-        <a class="footer-credit" href="https://datixai.com" target="_blank" rel="noopener">Developed by Datix AI</a>
+        <span class="footer-legal">
+          <a class="footer-credit" href="https://datixai.com" target="_blank" rel="noopener">Developed by Datix AI</a>
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <button type="button" class="link-btn" data-cookie-settings>Cookie settings</button>
+        </span>
         <span data-edit="tagline">Built for the forests of Azad Kashmir <i class="chinar text-leaf" aria-hidden="true"></i></span>
       </div>
     </div>`;
@@ -276,6 +281,52 @@ function addFaqJsonLd() {
   });
 }
 
+/* ── Cookies and terms ──────────────────────────────────────── */
+// FIRO has no ads, analytics or tracking: only storage the site needs to work.
+// The banner records the visitor's choice and acceptance of the Terms.
+const CONSENT_KEY = "firo_consent_v1";
+
+export function getConsent() {
+  try { return JSON.parse(localStorage.getItem(CONSENT_KEY) || "null"); } catch { return null; }
+}
+
+function showConsentBanner() {
+  document.getElementById("consent")?.remove();
+  const el = document.createElement("div");
+  el.id = "consent";
+  el.className = "consent glass";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-label", "Cookies and terms");
+  el.innerHTML = `
+    <div class="consent-text">
+      <strong><i class="fa-solid fa-cookie-bite" aria-hidden="true"></i> Cookies and terms</strong>
+      <p>FIRO uses only the cookies and storage needed to run this website, with no ads or tracking.
+        By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</p>
+    </div>
+    <div class="consent-actions">
+      <button type="button" class="btn btn-sm" data-consent="essential">Essential only</button>
+      <button type="button" class="btn btn-sm btn-leaf" data-consent="all">Accept all</button>
+    </div>`;
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-consent]");
+    if (!b) return;
+    try { localStorage.setItem(CONSENT_KEY, JSON.stringify({ choice: b.dataset.consent, terms: true, ms: Date.now() })); } catch {}
+    el.classList.add("hide");
+    setTimeout(() => el.remove(), 300);
+  });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+}
+
+function initConsent() {
+  if (!getConsent()) showConsentBanner();
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-cookie-settings]")) return;
+    e.preventDefault();
+    showConsentBanner();
+  });
+}
+
 export function initSite() {
   const page = document.body.dataset.page || "";
   applySeo(page);
@@ -287,4 +338,5 @@ export function initSite() {
   // Text edited in Admin → Website content (the admin preview waits on this promise)
   window.__firoContent = loadSiteContent(page).catch((err) => console.warn("[FIRO] Site content:", err));
   window.__firoContent.then(addFaqJsonLd);
+  if (window.self === window.top) initConsent();   // not inside the admin preview
 }

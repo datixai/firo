@@ -1149,3 +1149,37 @@ h3 { font-weight: 600; }
 }
 .faq details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
 .faq details p { margin: 0; padding: 0 24px 22px; color: var(--jg-text-dim); line-height: 1.6; }
+
+/* ── Legal pages ──────────────────────────────────────────── */
+.legal { max-width: 860px; margin: 0 auto; }
+.legal h2 { font-size: 1.3rem; margin: 1.8em 0 .5em; }
+.legal ul { padding-left: 1.2em; }
+.legal li { margin-bottom: .5em; }
+
+/* ── Cookie and terms banner ──────────────────────────────── */
+.consent {
+  position: fixed; z-index: 90; left: 16px; right: 16px; bottom: 16px;
+  max-width: 760px; margin: 0 auto; padding: 18px 20px;
+  display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: rgba(4, 20, 13, .94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  opacity: 0; transform: translateY(20px); transition: opacity .3s, transform .3s var(--ease-out);
+}
+.consent.show { opacity: 1; transform: none; }
+.consent.hide { opacity: 0; transform: translateY(20px); }
+.consent-text { flex: 1 1 360px; font-size: .9rem; color: var(--jg-text-dim); }
+.consent-text strong { color: var(--jg-text); display: block; margin-bottom: 4px; }
+.consent-text p { margin: 0; line-height: 1.5; }
+.consent-text a { text-decoration: underline; text-underline-offset: 3px; }
+.consent-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.footer-legal { display: inline-flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.footer-legal a, .link-btn { color: var(--jg-muted); font-size: inherit; }
+.link-btn { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
+.footer-legal a:hover, .link-btn:hover { color: #fff; }
+.terms-check { font-size: .9rem; color: var(--jg-text-dim); display: flex; gap: 10px; align-items: flex-start; }
+.terms-check input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--jg-leaf-bright); flex: none; }
+.terms-check a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Wide tables in articles scroll inside their own box on phones */
+.prose table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 640px) { .prose table { font-size: .88rem; } }

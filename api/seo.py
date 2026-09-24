@@ -42,6 +42,8 @@ PAGES = [
     ("/volunteers", "monthly", "0.7"),
     ("/donate",     "monthly", "0.7"),
     ("/blog",       "weekly",  "0.7"),
+    ("/terms",      "yearly",  "0.3"),
+    ("/privacy",    "yearly",  "0.3"),
 ]
 
 PRIVATE_PATHS = ["/admin", "/login", "/dashboard", "/analytics", "/map",
