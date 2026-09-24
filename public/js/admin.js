@@ -20,7 +20,7 @@ import { toast, formatDate } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { compressImage } from "/js/image-utils.js";
 import { STARTER_POSTS } from "/js/blog-data.js";
-import { STARTER_VOLUNTEERS, REGIONS, initials } from "/js/volunteers.js";
+import { STARTER_VOLUNTEERS, FIRST_STARTERS, REGIONS, initials } from "/js/volunteers.js";
 import { STARTER_TEAM, safeImage } from "/js/team.js";
 import { CATEGORIES, money, totalsByYear } from "/js/donate.js";
 import { applyContent, docIdFor, editableElements, loadSanitizer } from "/js/content.js";
@@ -793,18 +793,54 @@ onSnapshot(collection(db, COLLECTIONS.volunteers), (snap) => {
   if (!profilesChecked) { profilesChecked = true; takeOverProfiles(); }
 }, listenerError("featured volunteers"));
 
-/** First visit: copy the built-in profiles into Firestore so they can be edited here. */
+/** A built-in profile as stored in Firestore. */
+function starterProfile({ id, rev, ...v }) {
+  return { ...v, starter_rev: rev || 1, created_ms: Date.now(), updated_ms: Date.now() };
+}
+
+/** Never changed in the admin panel (older copies have no admin_edited flag, so compare the times). */
+function untouchedProfile(v) {
+  if (v.admin_edited) return false;
+  return v.starter_rev !== undefined || Math.abs((v.updated_ms || 0) - (v.created_ms || 0)) < 5000;
+}
+
+/**
+ * First visit: copy the built-in profiles into Firestore so they can be edited here.
+ * Later visits: add built-in profiles that are new since then, and bring unedited ones
+ * up to date. Profiles an admin deleted are not added back.
+ */
 async function takeOverProfiles() {
   try {
     const ref = doc(db, COLLECTIONS.content, "volunteers");
     const snap = await getDoc(ref);
-    if (snap.exists() && snap.data().profiles_managed) return;
+    const settings = snap.exists() ? snap.data() : {};
     const batch = writeBatch(db);
-    if (!profiles.length) {
-      STARTER_VOLUNTEERS.forEach(({ id, ...v }) => batch.set(doc(db, COLLECTIONS.volunteers, id), { ...v, created_ms: Date.now(), updated_ms: Date.now() }));
+    let added = 0, updated = 0;
+    if (!settings.profiles_managed) {
+      if (!profiles.length) STARTER_VOLUNTEERS.forEach((sp) => { batch.set(doc(db, COLLECTIONS.volunteers, sp.id), starterProfile(sp)); added++; });
+    } else {
+      const seen = new Set(settings.starters_seen || FIRST_STARTERS);
+      for (const sp of STARTER_VOLUNTEERS) {
+        const cur = profiles.find((p) => p.id === sp.id);
+        if (!cur && !seen.has(sp.id)) { batch.set(doc(db, COLLECTIONS.volunteers, sp.id), starterProfile(sp)); added++; }
+        else if (cur && (cur.starter_rev || 1) < (sp.rev || 1) && untouchedProfile(cur)) {
+          batch.set(doc(db, COLLECTIONS.volunteers, sp.id), { ...starterProfile(sp), created_ms: cur.created_ms || Date.now() }); updated++;
+        }
+      }
     }
-    batch.set(ref, { profiles_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
-    await batch.commit();
+    const allSeen = STARTER_VOLUNTEERS.map((sp) => sp.id);
+    if (!settings.profiles_managed || added || updated) {
+      batch.set(ref, { profiles_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
+      await batch.commit();
+    }
+    // Remember which built-in profiles were offered, so deleted ones stay deleted
+    if ((settings.starters_seen || []).length !== allSeen.length) {
+      await setDoc(ref, { starters_seen: allSeen }, { merge: true })
+        .catch((err) => console.warn("[FIRO] Publish the latest firestore.rules to remember deleted volunteers.", err));
+    }
+    if (settings.profiles_managed && (added || updated)) {
+      toast(`Featured volunteers: ${added} added${updated ? `, ${updated} updated` : ""}.`, "info", 7000);
+    }
   } catch (err) {
     console.error("[FIRO] Could not set up volunteer profiles:", err);
   }
@@ -829,7 +865,7 @@ $("volunteer-rows").addEventListener("click", async (e) => {
   const pub = e.target.closest("[data-vol-publish]");
   if (pub) {
     const v = profiles.find((x) => x.id === pub.dataset.volPublish);
-    try { await updateDoc(doc(db, COLLECTIONS.volunteers, v.id), { published: !v.published, updated_ms: Date.now() }); }
+    try { await updateDoc(doc(db, COLLECTIONS.volunteers, v.id), { published: !v.published, updated_ms: Date.now(), admin_edited: true }); }
     catch (err) { console.error(err); toast("Update failed", "error"); }
     return;
   }
@@ -855,6 +891,7 @@ function openVolunteerEditor(v) {
   editingVolunteer = v ? v.id : null;
   $("volunteer-editor-title").textContent = v ? `Edit ${v.name}` : "Add volunteer";
   $("vol-name").value = v?.name || "";
+  $("vol-region").innerHTML = Object.entries(REGIONS).map(([k, label]) => `<option value="${k}">${esc(label)}</option>`).join("");
   $("vol-region").value = v?.region || "ajk";
   $("vol-role").value = v?.role || "";
   $("vol-story").value = v?.story || "";
@@ -895,6 +932,7 @@ $("volunteer-form").addEventListener("submit", async (e) => {
     order: Number($("vol-order").value) || 0,
     published: $("vol-published").checked,
     updated_ms: Date.now(),
+    admin_edited: true,
   };
   $("save-volunteer").disabled = true;
   try {

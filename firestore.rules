@@ -100,8 +100,9 @@ service cloud.firestore {
     match /site_content/{page} {
       allow read: if true;
       allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed', 'profiles_managed', 'team_managed'])
+        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed', 'profiles_managed', 'team_managed', 'starters_seen'])
         && request.resource.data.get('fields', {}) is map
+        && request.resource.data.get('starters_seen', []) is list
         && request.resource.data.get('posts_managed', false) is bool
         && request.resource.data.get('profiles_managed', false) is bool
         && request.resource.data.get('team_managed', false) is bool;
