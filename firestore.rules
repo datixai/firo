@@ -20,6 +20,9 @@ rules_version = '2';
 //   volunteer_applications  "Become a volunteer" form (anyone creates, admins manage)
 //   volunteer_settings      doc "group": volunteers' WhatsApp group link (admins manage)
 //   team_members      "The people behind FIRO" on /about (admins manage)
+//   donation_pledges  Donate form (anyone creates, admins manage; private)
+//   donation_records  donations received: amount, cause, date (public, admins write)
+//   donation_uses     how donations were spent (public, admins write)
 // ─────────────────────────────────────────────────────────────
 
 service cloud.firestore {
@@ -111,6 +114,60 @@ service cloud.firestore {
       allow create, update: if isAdmin()
         && isText(request.resource.data.get('photo', ''), 500)
         && (request.resource.data.get('photo', '') == '' || request.resource.data.photo.matches('https://.+'));
+    }
+
+    // ── Donations ────────────────────────────────────────────
+    function isCause(v) {
+      return v in ['plantation', 'equipment', 'cameras', 'awareness', 'wildlife', 'general'];
+    }
+    function isAmount(v) {
+      return v is number && v > 0 && v <= 1000000000;
+    }
+
+    match /donation_pledges/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'category', 'amount', 'currency', 'name', 'email', 'phone', 'location', 'message',
+             'status', 'created_at', 'created_ms'])
+        && request.resource.data.keys().hasAll([
+             'category', 'amount', 'currency', 'name', 'email', 'phone', 'status', 'created_at', 'created_ms'])
+        && isCause(request.resource.data.category)
+        && isAmount(request.resource.data.amount)
+        && request.resource.data.currency in ['PKR', 'USD', 'GBP', 'EUR', 'SAR', 'AED']
+        && isText(request.resource.data.name, 100) && request.resource.data.name.size() > 0
+        && isText(request.resource.data.email, 200) && request.resource.data.email.size() > 0
+        && isText(request.resource.data.phone, 30) && request.resource.data.phone.size() > 0
+        && isText(request.resource.data.get('location', ''), 150)
+        && isText(request.resource.data.get('message', ''), 2000)
+        && request.resource.data.status == 'new'
+        && request.resource.data.created_at == request.time
+        && request.resource.data.created_ms is int;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Public totals: only amount, cause and date, never who gave
+    match /donation_records/{id} {
+      allow read: if true;
+      allow delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['amount', 'category', 'year', 'received_ms', 'pledge_id', 'created_ms', 'updated_ms'])
+        && isAmount(request.resource.data.amount)
+        && isCause(request.resource.data.category)
+        && request.resource.data.year is int
+        && request.resource.data.received_ms is int;
+    }
+
+    match /donation_uses/{id} {
+      allow read: if true;
+      allow delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'description', 'amount', 'category', 'year', 'date_ms', 'created_ms', 'updated_ms'])
+        && isText(request.resource.data.title, 150) && request.resource.data.title.size() > 0
+        && isText(request.resource.data.get('description', ''), 1500)
+        && isAmount(request.resource.data.amount)
+        && isCause(request.resource.data.category)
+        && request.resource.data.year is int
+        && request.resource.data.date_ms is int;
     }
 
     // ── Volunteers ───────────────────────────────────────────

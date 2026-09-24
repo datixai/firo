@@ -38,6 +38,9 @@ export const COLLECTIONS = {
   applications:      "volunteer_applications",  // "Become a volunteer" form
   volunteerSettings: "volunteer_settings",      // doc "group": volunteers' WhatsApp group link
   team:              "team_members",            // "The people behind FIRO" on /about (admin managed)
+  pledges:           "donation_pledges",        // Donate form (private)
+  donations:         "donation_records",        // donations received (public totals)
+  donationUses:      "donation_uses",           // how donations were used (public)
 };
 
 // ─────────────────────────────────────────────────────────────

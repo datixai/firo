@@ -5,7 +5,8 @@
  * "admins" collection. Firestore rules enforce the same check
  * (see firestore.rules), so hiding the page is not the only guard.
  *
- * Tabs: contact messages · volunteers (applications, WhatsApp group,
+ * Tabs: contact messages · donations (pledges, money received and
+ * how it was used) · volunteers (applications, WhatsApp group,
  * featured profiles) · blog posts · our team (About page) · website
  * content (text on the public pages) · staff access (control room). Fire reports are handled
  * in the control room (/incidents).
@@ -21,6 +22,7 @@ import { compressImage } from "/js/image-utils.js";
 import { STARTER_POSTS } from "/js/blog-data.js";
 import { STARTER_VOLUNTEERS, REGIONS, initials } from "/js/volunteers.js";
 import { STARTER_TEAM, safeImage } from "/js/team.js";
+import { CATEGORIES, money, totalsByYear } from "/js/donate.js";
 import { applyContent, docIdFor, editableElements, loadSanitizer } from "/js/content.js";
 import { onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -410,6 +412,251 @@ $("post-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ── Donations ──────────────────────────────────────────────── */
+let pledges = [], records = [], uses = [];
+const causeName = (k) => CATEGORIES[k]?.label || k || "";
+const dateInput = (ms) => new Date(ms || Date.now()).toISOString().slice(0, 10);
+const fromDateInput = (v) => { const t = new Date(`${v}T12:00:00`).getTime(); return Number.isFinite(t) ? t : Date.now(); };
+const PLEDGE_STATUS = { new: ["New", "new"], contacted: ["Contacted", "reviewing"], received: ["Received", "resolved"], declined: ["Declined", "dismissed"] };
+
+onSnapshot(query(collection(db, COLLECTIONS.pledges), orderBy("created_ms", "desc"), limit(500)), (snap) => {
+  pledges = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  setBadge("count-pledges", pledges.filter((p) => p.status === "new").length);
+  renderPledges();
+  renderRecords();
+}, listenerError("donation pledges"));
+onSnapshot(collection(db, COLLECTIONS.donations), (snap) => {
+  records = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.received_ms || 0) - (a.received_ms || 0));
+  renderRecords();
+  renderYears();
+}, listenerError("donations"));
+onSnapshot(collection(db, COLLECTIONS.donationUses), (snap) => {
+  uses = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date_ms || 0) - (a.date_ms || 0));
+  renderUses();
+  renderYears();
+}, listenerError("donation spending"));
+
+function renderYears() {
+  const byYear = totalsByYear(records);
+  const spent = {};
+  uses.forEach((u) => { spent[u.year] = (spent[u.year] || 0) + (Number(u.amount) || 0); });
+  const years = [...new Set([...Object.keys(byYear), ...Object.keys(spent)])].map(Number).sort((a, b) => b - a);
+  $("year-rows").innerHTML = years.map((y) => `
+    <tr><td><strong>${y}</strong></td><td>${esc(money(byYear[y]?.total || 0))}</td><td>${esc(money(spent[y] || 0))}</td><td class="text-dim">${byYear[y]?.count || 0}</td></tr>`).join("")
+    || `<tr><td colspan="4" class="empty">Nothing recorded yet.</td></tr>`;
+}
+
+$("pledge-filter").addEventListener("change", renderPledges);
+function pledgeMessage(p) {
+  return `Assalam o Alaikum ${p.name}! Thank you for your pledge of ${money(p.amount, p.currency)} for ${causeName(p.category)} to FIRO. `;
+}
+function renderPledges() {
+  const filter = $("pledge-filter").value;
+  const list = pledges.filter((p) => !filter || p.status === filter);
+  $("pledge-list").innerHTML = list.map((p) => {
+    const [label, pill] = PLEDGE_STATUS[p.status] || [p.status, "draft"];
+    const mail = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent("Your donation to FIRO")}&body=${encodeURIComponent(pledgeMessage(p))}`;
+    return `
+    <article class="glass item">
+      <div class="item-top">
+        <div class="item-title">${esc(money(p.amount, p.currency))} · ${esc(causeName(p.category))}</div>
+        <span class="pill pill-${pill}">${esc(label)}</span>
+      </div>
+      <div class="item-meta">
+        <span><i class="fa-solid fa-user"></i>${esc(p.name)}</span>
+        ${p.location ? `<span><i class="fa-solid fa-location-dot"></i>${esc(p.location)}</span>` : ""}
+        <span><i class="fa-solid fa-at"></i><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></span>
+        <span><i class="fa-solid fa-phone"></i><a href="tel:${esc(p.phone)}">${esc(p.phone)}</a></span>
+        <span><i class="fa-regular fa-clock"></i>${esc(timeText(p.created_ms))}</span>
+        ${p.received_amount ? `<span><i class="fa-solid fa-circle-check"></i>Received ${esc(money(p.received_amount))}</span>` : ""}
+      </div>
+      ${p.message ? `<div class="item-body"><strong class="text-dim" style="font-size:.85rem;">Message / prayer request</strong><br />${esc(p.message)}</div>` : ""}
+      <div class="item-actions">
+        <button class="btn btn-sm btn-leaf" data-pledge-wa="${esc(p.id)}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+        <a class="btn btn-sm" href="${mail}" data-pledge-mail="${esc(p.id)}"><i class="fa-solid fa-envelope"></i> Email</a>
+        ${p.status !== "received" ? `<button class="btn btn-sm btn-leaf" data-pledge-record="${esc(p.id)}"><i class="fa-solid fa-sack-dollar"></i> Record donation</button>` : ""}
+        ${p.status === "new" ? `<button class="btn btn-sm" data-pledge-status="contacted" data-pledge="${esc(p.id)}">Mark contacted</button>` : ""}
+        ${p.status !== "declined" && p.status !== "received" ? `<button class="btn btn-sm" data-pledge-status="declined" data-pledge="${esc(p.id)}">Didn't donate</button>` : ""}
+        <button class="btn btn-sm btn-danger" data-delete-pledge="${esc(p.id)}"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </article>`;
+  }).join("") || `<div class="glass empty"><i class="fa-solid fa-inbox" aria-hidden="true"></i>No pledges in this view.</div>`;
+}
+
+const markContacted = (p) => {
+  if (p.status !== "new") return;
+  updateDoc(doc(db, COLLECTIONS.pledges, p.id), { status: "contacted", contacted_ms: Date.now(), handled_by: user.email || user.uid })
+    .catch((err) => console.error(err));
+};
+
+$("pledge-list").addEventListener("click", async (e) => {
+  const id = (k) => e.target.closest(`[${k}]`)?.getAttribute(k);
+  const wa = id("data-pledge-wa"), mail = id("data-pledge-mail"), rec = id("data-pledge-record"), del = id("data-delete-pledge");
+  const st = e.target.closest("[data-pledge-status]");
+  if (wa) {
+    const p = pledges.find((x) => x.id === wa);
+    window.open(`https://wa.me/${waNumber(p.phone)}?text=${encodeURIComponent(pledgeMessage(p))}`, "_blank");
+    markContacted(p);
+  } else if (mail) {
+    markContacted(pledges.find((x) => x.id === mail));
+  } else if (rec) {
+    openRecordEditor(null, pledges.find((x) => x.id === rec));
+  } else if (st) {
+    try {
+      await updateDoc(doc(db, COLLECTIONS.pledges, st.dataset.pledge),
+        { status: st.dataset.pledgeStatus, [`${st.dataset.pledgeStatus}_ms`]: Date.now(), handled_by: user.email || user.uid });
+    } catch (err) { console.error(err); toast("Update failed", "error"); }
+  } else if (del && confirm("Delete this pledge permanently?")) {
+    try { await deleteDoc(doc(db, COLLECTIONS.pledges, del)); toast("Pledge deleted", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+
+/* Donations received */
+function renderRecords() {
+  $("record-rows").innerHTML = records.map((r) => {
+    const p = r.pledge_id && pledges.find((x) => x.id === r.pledge_id);
+    return `
+    <tr>
+      <td class="text-dim">${esc(formatDate(r.received_ms))}</td>
+      <td>${esc(causeName(r.category))}</td>
+      <td><strong>${esc(money(r.amount))}</strong></td>
+      <td class="text-dim">${p ? esc(p.name) : r.pledge_id ? "Pledge" : "Added by hand"}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-sm" data-record-edit="${esc(r.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn btn-sm btn-danger" data-record-delete="${esc(r.id)}"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">No donations recorded yet.</td></tr>`;
+}
+
+let editingRecord = null, recordPledge = null;
+function openRecordEditor(r, pledge = null) {
+  editingRecord = r ? r.id : null;
+  recordPledge = pledge || (r?.pledge_id && pledges.find((x) => x.id === r.pledge_id)) || null;
+  $("record-title").textContent = r ? "Edit donation" : "Record donation";
+  $("record-from").textContent = recordPledge
+    ? `From ${recordPledge.name} (pledged ${money(recordPledge.amount, recordPledge.currency)}). Enter the amount actually received, in rupees.`
+    : "A donation received outside the Donate form.";
+  $("record-amount").value = r?.amount ?? (pledge && pledge.currency === "PKR" ? pledge.amount : "");
+  $("record-date").value = dateInput(r?.received_ms);
+  $("record-category").value = r?.category || pledge?.category || "general";
+  $("record-status").innerHTML = "";
+  openModal("record-modal");
+  $("record-amount").focus();
+}
+$("new-record").addEventListener("click", () => openRecordEditor(null));
+$("record-rows").addEventListener("click", async (e) => {
+  const edit = e.target.closest("[data-record-edit]"), del = e.target.closest("[data-record-delete]");
+  if (edit) openRecordEditor(records.find((x) => x.id === edit.dataset.recordEdit));
+  if (del && confirm("Delete this donation from the records? It will also leave the public totals.")) {
+    const r = records.find((x) => x.id === del.dataset.recordDelete);
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, COLLECTIONS.donations, r.id));
+      if (r.pledge_id && pledges.some((p) => p.id === r.pledge_id)) {
+        batch.update(doc(db, COLLECTIONS.pledges, r.pledge_id), { status: "contacted", received_amount: 0 });
+      }
+      await batch.commit();
+      toast("Donation removed", "success");
+    } catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+$("record-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const amount = Number($("record-amount").value);
+  const fail = (msg) => { $("record-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
+  if (!(amount > 0) || amount > 1e9) return fail("Enter the amount received in rupees.");
+  const received_ms = fromDateInput($("record-date").value);
+  const data = {
+    amount: Math.round(amount),
+    category: $("record-category").value,
+    year: new Date(received_ms).getFullYear(),
+    received_ms,
+    pledge_id: recordPledge?.id || "",
+    updated_ms: Date.now(),
+  };
+  $("save-record").disabled = true;
+  try {
+    const batch = writeBatch(db);
+    const ref = editingRecord ? doc(db, COLLECTIONS.donations, editingRecord) : doc(collection(db, COLLECTIONS.donations));
+    batch.set(ref, editingRecord ? { ...data, created_ms: records.find((x) => x.id === editingRecord)?.created_ms || Date.now() } : { ...data, created_ms: Date.now() });
+    if (recordPledge) {
+      batch.update(doc(db, COLLECTIONS.pledges, recordPledge.id),
+        { status: "received", received_amount: data.amount, received_ms, record_id: ref.id, handled_by: user.email || user.uid });
+    }
+    await batch.commit();
+    toast("Donation recorded. It now counts in the public totals.", "success");
+    $("record-modal").classList.remove("open");
+  } catch (err) {
+    console.error(err);
+    fail("Save failed. Check that the latest security rules are published.");
+  } finally {
+    $("save-record").disabled = false;
+  }
+});
+
+/* How donations were used */
+function renderUses() {
+  $("use-rows").innerHTML = uses.map((u) => `
+    <tr>
+      <td class="text-dim">${esc(formatDate(u.date_ms))}</td>
+      <td><strong>${esc(u.title)}</strong>${u.description ? `<br /><span class="text-muted" style="font-size:.85rem;">${esc(u.description.slice(0, 90))}${u.description.length > 90 ? "…" : ""}</span>` : ""}</td>
+      <td>${esc(causeName(u.category))}</td>
+      <td><strong>${esc(money(u.amount))}</strong></td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-sm" data-use-edit="${esc(u.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn btn-sm btn-danger" data-use-delete="${esc(u.id)}"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="5" class="empty">No spending reported yet.</td></tr>`;
+}
+let editingUse = null;
+function openUseEditor(u) {
+  editingUse = u ? u.id : null;
+  $("use-title").textContent = u ? "Edit spending" : "Add spending";
+  $("use-what").value = u?.title || "";
+  $("use-amount").value = u?.amount ?? "";
+  $("use-date").value = dateInput(u?.date_ms);
+  $("use-category").value = u?.category || "plantation";
+  $("use-description").value = u?.description || "";
+  $("use-status").innerHTML = "";
+  openModal("use-modal");
+  $("use-what").focus();
+}
+$("new-use").addEventListener("click", () => openUseEditor(null));
+$("use-rows").addEventListener("click", async (e) => {
+  const edit = e.target.closest("[data-use-edit]"), del = e.target.closest("[data-use-delete]");
+  if (edit) openUseEditor(uses.find((x) => x.id === edit.dataset.useEdit));
+  if (del && confirm("Delete this spending entry? It will also leave the public report.")) {
+    try { await deleteDoc(doc(db, COLLECTIONS.donationUses, del.dataset.useDelete)); toast("Removed", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+$("use-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("use-what").value.trim(), amount = Number($("use-amount").value);
+  const fail = (msg) => { $("use-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
+  if (!title) return fail("Say what the money was used for.");
+  if (!(amount > 0) || amount > 1e9) return fail("Enter the amount spent in rupees.");
+  const date_ms = fromDateInput($("use-date").value);
+  const data = {
+    title, amount: Math.round(amount), category: $("use-category").value,
+    description: $("use-description").value.trim(), year: new Date(date_ms).getFullYear(), date_ms, updated_ms: Date.now(),
+  };
+  $("save-use").disabled = true;
+  try {
+    if (editingUse) await setDoc(doc(db, COLLECTIONS.donationUses, editingUse), { ...data, created_ms: uses.find((x) => x.id === editingUse)?.created_ms || Date.now() });
+    else await setDoc(doc(collection(db, COLLECTIONS.donationUses)), { ...data, created_ms: Date.now() });
+    toast("Saved. It now shows on the Donate page.", "success");
+    $("use-modal").classList.remove("open");
+  } catch (err) {
+    console.error(err);
+    fail("Save failed. Check that the latest security rules are published.");
+  } finally {
+    $("save-use").disabled = false;
+  }
+});
+
 /* ── Volunteers: applications ───────────────────────────────── */
 let applications = [];
 let groupLink = "";
@@ -777,7 +1024,7 @@ const CONTENT_PAGES = [
   { id: "volunteers", label: "Volunteers",  url: "/volunteers" },
   { id: "blog",    label: "Blog",          url: "/blog" },
   { id: "report",  label: "Report a Fire", url: "/report" },
-  { id: "contact", label: "Contact",       url: "/contact" },
+  { id: "donate",  label: "Donate",        url: "/donate" },
   { id: "footer",  label: "Footer",        url: "/" },
 ];
 const KIND_LABELS = {

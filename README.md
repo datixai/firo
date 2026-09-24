@@ -164,7 +164,8 @@ FIRO-FYP/
 │   ├── post.html                    # Single article                              → /blog/<slug>
 │   ├── report.html                  # Public "Report a Fire" form                 → /report
 │   ├── volunteers.html              # Featured volunteers + "Become a volunteer"  → /volunteers
-│   ├── contact.html                 # Contact form                                → /contact
+│   ├── donate.html                  # Donate: pledge form + yearly totals & spending → /donate
+│   ├── contact.html                 # Redirects to /donate
 │   ├── admin.html                   # Hidden admin panel (not linked anywhere)    → /admin
 │   ├── 404.html                     # "Lost in the jungle" page
 │   ├── dashboard.html               # Control room: Overview                      → /dashboard
@@ -185,6 +186,7 @@ FIRO-FYP/
 │   │   ├── content.js               # Website text edited in the admin panel
 │   │   ├── volunteers.js            # Volunteers page data (built-in profiles, group link)
 │   │   ├── team.js                  # About page team (built-in members)
+│   │   ├── donate.js                # Donation causes, currencies and totals
 │   │   ├── ops/data.js              # Control room: live data, incidents, workflow actions
 │   │   ├── ops/shell.js             # Control room: top bar, kiosk, sound alerts, pop-out
 │   │   ├── ops/charts.js            # Control room: SVG charts with table views
@@ -363,7 +365,10 @@ page itself just tells other people to contact the administrator.
 3. Firebase Console → Firestore Database → at the top level (not inside `artifacts`) **Start collection** →
    Collection ID `admins` → Document ID = *the UID* → add a field `email` (string) → **Save**.
 4. Open `/admin`. The profile icon (top right) opens **Website**, **Dashboard** and **Log out**. Tabs:
-   - **Messages:** read, reply by email, mark read/unread, delete
+   - **Messages:** read, reply by email, mark read/unread, delete (older messages from the former Contact page)
+   - **Donations:** pledges from the Donate page (cause, amount, message or prayer request); contact the donor on
+     WhatsApp or email, then **Record donation** with the amount received. Add donations received outside the form
+     and report how money was spent. Yearly totals and spending are shown publicly on `/donate` (no donor names)
    - **Volunteers:** approve or decline applications from the Volunteers page, send approved volunteers the
      WhatsApp group invite with one tap, update the group link (optionally show it publicly), and add, edit,
      show/hide or delete the featured volunteer cards (Azad Jammu & Kashmir, Pakistan, World)
@@ -416,7 +421,7 @@ and paused for visitors who prefer reduced motion.
 | Blog | `/blog`, `/blog/<slug>` | Articles with topic filter and search; posts are managed in the admin panel |
 | Report a Fire | `/report` | Public form: what they see, GPS / map pin, place, details, photo, contact; optional WhatsApp forward |
 | Volunteers | `/volunteers` | Featured volunteers from AJK, Pakistan and the world; "Become a volunteer" form; optional WhatsApp group button |
-| Contact | `/contact` | Contact form (saved for admins) plus WhatsApp / email / university details |
+| Donate | `/donate` | Pledge form (cause, amount, message or prayer request); yearly donation totals by cause and how they were used. `/contact` redirects here |
 
 ### Control room (opened from the profile icon in the nav bar)
 

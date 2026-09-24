@@ -24,6 +24,11 @@
       "source": "/dash/:path*",
       "destination": "/analytics",
       "permanent": true
+    },
+    {
+      "source": "/contact",
+      "destination": "/donate",
+      "permanent": false
     }
   ],
   "rewrites": [

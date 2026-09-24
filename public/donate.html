@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO | Donate</title>
+  <meta name="description" content="Support FIRO: fund tree plantation, firefighting equipment and early-warning cameras for the forests of Azad Jammu & Kashmir, and see how every donation is used." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="donate">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span data-edit="s1-label1" class="eyebrow fire"><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Donate</span>
+        <h1 data-edit="s1-title1">Help protect Kashmir's forests</h1>
+        <p data-edit="s1-text1">Tell us how you would like to help. A member of our team will contact you personally and explain how to send your donation.</p>
+      </div>
+    </section>
+
+    <!-- Form -->
+    <section class="section-tight">
+      <div class="container donate-grid">
+        <div class="glass card reveal" id="form-card">
+          <form class="form" id="donate-form" novalidate>
+            <div class="field">
+              <span class="field-label">What would you like to support? <span class="req">*</span></span>
+              <div class="category-grid" id="category-choices" role="radiogroup" aria-label="Donation category"></div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label for="amount">Amount you would like to give <span class="req">*</span></label>
+                <div class="amount-row">
+                  <select class="select" id="currency" aria-label="Currency"></select>
+                  <input class="input" id="amount" type="number" min="1" step="1" inputmode="numeric" required placeholder="e.g. 5000" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="location">City or country</label>
+                <input class="input" id="location" maxlength="150" placeholder="e.g. Muzaffarabad" autocomplete="address-level2" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="name">Full name <span class="req">*</span></label>
+              <input class="input" id="name" maxlength="100" required autocomplete="name" />
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label for="email">Email <span class="req">*</span></label>
+                <input class="input" id="email" type="email" maxlength="200" required autocomplete="email" />
+              </div>
+              <div class="field">
+                <label for="phone">Phone / WhatsApp <span class="req">*</span></label>
+                <input class="input" id="phone" type="tel" maxlength="30" required placeholder="03xx xxxxxxx" autocomplete="tel" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="message">Message or prayer request</label>
+              <textarea class="textarea" id="message" maxlength="2000" placeholder="Anything you'd like us to know. You can also ask us to pray for someone special."></textarea>
+              <span class="hint"><span id="count">0</span> / 2000</span>
+            </div>
+            <!-- Spam trap: real people never fill this in -->
+            <div class="honeypot" aria-hidden="true">
+              <label for="website">Website</label>
+              <input id="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <div id="form-status"></div>
+            <button class="btn btn-fire btn-lg" type="submit" id="submit-btn">
+              <i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Send my pledge
+            </button>
+            <p class="hint" style="margin:0;">No payment is taken on this website. We will contact you with safe ways to send your donation.</p>
+          </form>
+        </div>
+
+        <div class="donate-side reveal">
+          <h2 data-edit="s2-title1">Every rupee is accounted for</h2>
+          <p data-edit="s2-text1" class="text-dim">We publish what we receive each year and how it is spent, below on this page.</p>
+          <ol class="donate-steps">
+            <li><strong data-edit="s2-heading1">Send your pledge</strong><span data-edit="s2-text2">Choose a cause and an amount.</span></li>
+            <li><strong data-edit="s2-heading2">We contact you</strong><span data-edit="s2-text3">A team member calls or messages you with the ways to donate.</span></li>
+            <li><strong data-edit="s2-heading3">See the impact</strong><span data-edit="s2-text4">Your donation appears in the yearly totals and its use is reported here.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- Transparency -->
+    <section class="section" id="impact">
+      <div class="container">
+        <div class="section-head reveal">
+          <span data-edit="s3-label1" class="eyebrow">Transparency</span>
+          <h2 data-edit="s3-title1">Donations and how they were used</h2>
+          <p data-edit="s3-text1">Totals are updated by our team each time a donation is received or spent.</p>
+        </div>
+        <div id="impact-body">
+          <div class="empty"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quote -->
+    <section class="page-quote" data-edit-group="Quote">
+      <figure class="container reveal">
+        <blockquote data-edit="quote">No one has ever become poor by giving.</blockquote>
+        <figcaption data-edit="quoteby">Anne Frank</figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, initReveal, toast, formatDate } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { initFirebase, ensureUser, COLLECTIONS } from "/js/firebase-init.js";
+    import { CATEGORIES, CURRENCIES, money, totalsByYear } from "/js/donate.js";
+    import { collection, addDoc, getDocs, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    initSite();
+    const $ = (id) => document.getElementById(id);
+
+    /* ── Form controls ───────────────────────────────────── */
+    const wanted = new URLSearchParams(location.search).get("for");
+    $("category-choices").innerHTML = Object.entries(CATEGORIES).map(([key, c], i) => `
+      <label class="category-choice">
+        <input type="radio" name="category" value="${key}" ${(wanted ? wanted === key : i === 0) ? "checked" : ""} />
+        <i class="fa-solid ${c.icon}" aria-hidden="true"></i>
+        <span><strong>${esc(c.label)}</strong><small>${esc(c.text)}</small></span>
+      </label>`).join("");
+    $("currency").innerHTML = CURRENCIES.map((c) => `<option>${c}</option>`).join("");
+    $("message").addEventListener("input", () => { $("count").textContent = $("message").value.length; });
+
+    let firebase = null;
+    try { firebase = await initFirebase(); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+
+    /* ── Transparency: yearly totals and how they were used ── */
+    async function loadImpact() {
+      const body = $("impact-body");
+      if (!firebase) { body.innerHTML = `<div class="empty">Totals are not available right now.</div>`; return; }
+      let records = [], uses = [];
+      try {
+        [records, uses] = await Promise.all([
+          getDocs(collection(firebase.db, COLLECTIONS.donations)).then((s) => s.docs.map((d) => d.data())),
+          getDocs(collection(firebase.db, COLLECTIONS.donationUses)).then((s) => s.docs.map((d) => d.data())),
+        ]);
+      } catch (err) {
+        console.warn("[FIRO] Could not load donation totals:", err);
+      }
+      const byYear = totalsByYear(records);
+      const years = [...new Set([...Object.keys(byYear), ...uses.map((u) => String(u.year))])].map(Number).sort((a, b) => b - a);
+      if (!years.length) {
+        body.innerHTML = `<div class="empty">The first yearly report will appear here once donations are received.</div>`;
+        return;
+      }
+      body.innerHTML = `
+        <div class="year-tabs choice-group" role="radiogroup" aria-label="Year">
+          ${years.map((y, i) => `<label class="choice"><input type="radio" name="year" value="${y}" ${i === 0 ? "checked" : ""} />${y}</label>`).join("")}
+        </div>
+        <div id="year-report"></div>`;
+      const render = () => {
+        const y = Number(document.querySelector('input[name="year"]:checked').value);
+        const t = byYear[y] || { total: 0, count: 0, byCategory: {} };
+        const spent = uses.filter((u) => u.year === y).sort((a, b) => (b.date_ms || 0) - (a.date_ms || 0));
+        const spentTotal = spent.reduce((s, u) => s + (Number(u.amount) || 0), 0);
+        const cats = Object.entries(t.byCategory).sort((a, b) => b[1] - a[1]);
+        const max = Math.max(1, ...cats.map(([, v]) => v));
+        $("year-report").innerHTML = `
+          <div class="impact-stats">
+            <div><div class="impact-value">${esc(money(t.total))}</div><div class="impact-label">received in ${y}${t.count ? ` from ${t.count} donation${t.count === 1 ? "" : "s"}` : ""}</div></div>
+            <div><div class="impact-value">${esc(money(spentTotal))}</div><div class="impact-label">spent on forest work in ${y}</div></div>
+          </div>
+          <div class="impact-grid">
+            <div class="glass card">
+              <h3>Received by cause</h3>
+              ${cats.length ? `<div class="bar-list">${cats.map(([k, v]) => `
+                <div class="bar-row" title="${esc(CATEGORIES[k]?.label || k)}: ${esc(money(v))}">
+                  <span class="bar-name">${esc(CATEGORIES[k]?.label || k)}</span>
+                  <span class="bar-track"><span class="bar-fill" style="width:${Math.max(2, (v / max) * 100)}%"></span></span>
+                  <span class="bar-value">${esc(money(v))}</span>
+                </div>`).join("")}</div>` : `<p class="text-muted">No donations recorded for ${y} yet.</p>`}
+            </div>
+            <div class="glass card">
+              <h3>How it was used</h3>
+              ${spent.length ? `<ul class="use-list">${spent.map((u) => `
+                <li>
+                  <div class="use-top"><strong>${esc(u.title)}</strong><span>${esc(money(u.amount))}</span></div>
+                  <div class="use-meta"><span class="tag">${esc(CATEGORIES[u.category]?.label || u.category || "")}</span>${u.date_ms ? `<span>${esc(formatDate(u.date_ms))}</span>` : ""}</div>
+                  ${u.description ? `<p>${esc(u.description)}</p>` : ""}
+                </li>`).join("")}</ul>` : `<p class="text-muted">Spending for ${y} will be reported here.</p>`}
+            </div>
+          </div>`;
+      };
+      body.addEventListener("change", (e) => { if (e.target.name === "year") render(); });
+      render();
+    }
+    loadImpact();
+
+    /* ── Pledge form ─────────────────────────────────────── */
+    const form = $("donate-form"), statusEl = $("form-status"), submit = $("submit-btn");
+    const RATE_KEY = "firo_pledge_sent_at";
+    if (!firebase) {
+      statusEl.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>The form is temporarily unavailable.</div></div>`;
+      submit.disabled = true;
+    }
+    function showStatus(kind, html) {
+      const icon = kind === "error" ? "fa-circle-exclamation" : "fa-circle-check";
+      statusEl.innerHTML = `<div class="alert alert-${kind}"><i class="fa-solid ${icon}" aria-hidden="true"></i><div>${html}</div></div>`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      statusEl.innerHTML = "";
+      const val = (id) => $(id).value.trim();
+      if (val("website")) return;  // bot
+      const data = {
+        category: document.querySelector('input[name="category"]:checked')?.value || "general",
+        amount: Number(val("amount")),
+        currency: $("currency").value,
+        name: val("name"),
+        email: val("email"),
+        phone: val("phone"),
+        location: val("location"),
+        message: val("message"),
+      };
+      if (!data.name || !data.email || !data.phone) return showStatus("error", "Please fill in your name, email and phone number.");
+      if (!(data.amount > 0) || data.amount > 1e9) return showStatus("error", "Please enter the amount you would like to give.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return showStatus("error", "Please enter a valid email address.");
+      if (!/^[+\d][\d\s()-]{6,}$/.test(data.phone)) return showStatus("error", "Please enter a valid phone number.");
+
+      let last = 0;
+      try { last = Number(localStorage.getItem(RATE_KEY)) || 0; } catch {}
+      if (Date.now() - last < 60_000) return showStatus("error", "You just sent a pledge. Please wait a minute before sending another.");
+
+      submit.disabled = true;
+      submit.innerHTML = `<span class="spinner" style="width:18px;height:18px;"></span> Sending…`;
+      try {
+        await ensureUser(firebase.auth);
+        await addDoc(collection(firebase.db, COLLECTIONS.pledges), {
+          ...data, status: "new", created_at: serverTimestamp(), created_ms: Date.now(),
+        });
+        try { localStorage.setItem(RATE_KEY, String(Date.now())); } catch {}
+        form.reset();
+        document.querySelector('input[name="category"]').checked = true;
+        $("count").textContent = "0";
+        showStatus("success", `Thank you, ${esc(data.name)}! May Allah reward you. A member of our team will contact you soon on <strong>${esc(data.phone)}</strong> or <strong>${esc(data.email)}</strong> with the ways to send your donation.`);
+        toast("Pledge sent", "success");
+      } catch (err) {
+        console.error("[FIRO] Donate form failed:", err);
+        showStatus("error", "Sorry, your pledge could not be sent. Please try again in a moment.");
+      } finally {
+        submit.disabled = false;
+        submit.innerHTML = `<i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Send my pledge`;
+      }
+    });
+  </script>
+</body>
+</html>

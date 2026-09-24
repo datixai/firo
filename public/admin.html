@@ -141,6 +141,7 @@
     <div id="state-admin" hidden>
       <div class="tabs" role="tablist">
         <button class="tab active" data-tab="messages" role="tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Messages <span class="count" id="count-messages" hidden></span></button>
+        <button class="tab" data-tab="donations" role="tab"><i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i> Donations <span class="count" id="count-pledges" hidden></span></button>
         <button class="tab" data-tab="volunteers" role="tab"><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Volunteers <span class="count" id="count-applications" hidden></span></button>
         <button class="tab" data-tab="blog" role="tab"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</button>
         <button class="tab" data-tab="people" role="tab"><i class="fa-solid fa-users" aria-hidden="true"></i> Our team</button>
@@ -180,6 +181,52 @@
           <table class="table">
             <thead><tr><th>Title</th><th>Status</th><th>Date</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody id="post-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Donations -->
+      <section data-panel="donations" hidden>
+        <div class="glass card" style="margin-bottom:22px;">
+          <h3 style="margin-top:0;">Totals by year</h3>
+          <p class="text-dim" style="font-size:.9rem;margin-top:-4px;">These totals and the spending list are shown publicly on the Donate page (amounts and causes only, never donor names).</p>
+          <div class="table-wrap"><table class="table">
+            <thead><tr><th>Year</th><th>Received</th><th>Spent</th><th>Donations</th></tr></thead>
+            <tbody id="year-rows"></tbody>
+          </table></div>
+        </div>
+
+        <div class="panel-head">
+          <h2>Pledges</h2>
+          <select class="select select-sm" id="pledge-filter" aria-label="Filter pledges">
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="received">Received</option>
+            <option value="declined">Declined</option>
+            <option value="">All</option>
+          </select>
+        </div>
+        <div id="pledge-list"></div>
+
+        <div class="panel-head" style="margin-top:30px;">
+          <h2>Donations received</h2>
+          <button class="btn btn-sm btn-leaf" id="new-record"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add donation</button>
+        </div>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Date</th><th>Cause</th><th>Amount</th><th>From</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="record-rows"></tbody>
+          </table>
+        </div>
+
+        <div class="panel-head" style="margin-top:30px;">
+          <h2>How donations were used</h2>
+          <button class="btn btn-sm btn-leaf" id="new-use"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add spending</button>
+        </div>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Date</th><th>What</th><th>Cause</th><th>Amount</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="use-rows"></tbody>
           </table>
         </div>
       </section>
@@ -385,6 +432,85 @@
         <div class="item-actions" style="justify-content:flex-end;">
           <button type="button" class="btn" data-close>Cancel</button>
           <button type="submit" class="btn btn-leaf" id="save-post"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save post</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Donation received editor -->
+  <div class="modal-backdrop" id="record-modal">
+    <div class="glass modal" style="max-width:560px;">
+      <div class="modal-head"><h3 id="record-title">Record donation</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="record-form">
+        <p class="text-dim" id="record-from" style="margin:0;font-size:.92rem;"></p>
+        <div class="form-row">
+          <div class="field">
+            <label for="record-amount">Amount received (PKR) <span class="req">*</span></label>
+            <input class="input" id="record-amount" type="number" min="1" step="1" required />
+          </div>
+          <div class="field">
+            <label for="record-date">Date received</label>
+            <input class="input" id="record-date" type="date" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="record-category">Cause</label>
+          <select class="select" id="record-category">
+              <option value="plantation">Tree plantation</option>
+              <option value="equipment">Firefighting equipment</option>
+              <option value="cameras">Early-warning cameras</option>
+              <option value="awareness">Community awareness</option>
+              <option value="wildlife">Wildlife &amp; forest care</option>
+              <option value="general">Where it's needed most</option>
+          </select>
+        </div>
+        <div id="record-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-record"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Spending editor -->
+  <div class="modal-backdrop" id="use-modal">
+    <div class="glass modal" style="max-width:620px;">
+      <div class="modal-head"><h3 id="use-title">Add spending</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="use-form">
+        <div class="field">
+          <label for="use-what">What was it used for? <span class="req">*</span></label>
+          <input class="input" id="use-what" maxlength="150" required placeholder="e.g. 500 pine saplings planted near Kotli" />
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="use-amount">Amount spent (PKR) <span class="req">*</span></label>
+            <input class="input" id="use-amount" type="number" min="1" step="1" required />
+          </div>
+          <div class="field">
+            <label for="use-date">Date</label>
+            <input class="input" id="use-date" type="date" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="use-category">Cause</label>
+          <select class="select" id="use-category">
+              <option value="plantation">Tree plantation</option>
+              <option value="equipment">Firefighting equipment</option>
+              <option value="cameras">Early-warning cameras</option>
+              <option value="awareness">Community awareness</option>
+              <option value="wildlife">Wildlife &amp; forest care</option>
+              <option value="general">Where it's needed most</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="use-description">Details (optional)</label>
+          <textarea class="textarea" id="use-description" maxlength="1500" style="min-height:90px;"></textarea>
+        </div>
+        <div id="use-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-use"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
         </div>
       </form>
     </div>
