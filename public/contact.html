@@ -77,17 +77,6 @@
               <a class="btn btn-sm" href="tel:1122"><i class="fa-solid fa-phone" aria-hidden="true"></i> Rescue 1122</a>
             </p>
           </div>
-          <div class="glass card reveal" id="whatsapp-card" hidden>
-            <div class="icon-badge"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
-            <h3 data-edit="s2-heading2">WhatsApp</h3>
-            <p data-edit="s2-text2">Prefer chatting? Message the team directly.</p>
-            <p style="margin-top:14px;"><a class="btn btn-sm" id="whatsapp-link" target="_blank" rel="noopener">Open WhatsApp</a></p>
-          </div>
-          <div class="glass card reveal" id="email-card" hidden>
-            <div class="icon-badge"><i class="fa-solid fa-at" aria-hidden="true"></i></div>
-            <h3 data-edit="s2-heading3">Email</h3>
-            <p><a id="email-link"></a></p>
-          </div>
         </div>
       </div>
     </section>
@@ -119,18 +108,6 @@
     let firebase = null;
     try {
       firebase = await initFirebase();
-      const { whatsappNumber, contactEmail } = firebase.settings;
-      if (whatsappNumber) {
-        document.getElementById("whatsapp-link").href =
-          `https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello FIRO team, ")}`;
-        document.getElementById("whatsapp-card").hidden = false;
-      }
-      if (contactEmail) {
-        const a = document.getElementById("email-link");
-        a.href = `mailto:${contactEmail}`;
-        a.textContent = contactEmail;
-        document.getElementById("email-card").hidden = false;
-      }
     } catch (err) {
       console.error(err);
       statusEl.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>The contact form is temporarily unavailable.</div></div>`;
