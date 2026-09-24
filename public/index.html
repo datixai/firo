@@ -23,15 +23,15 @@
     <section class="hero">
       <div class="container">
         <div class="hero-inner reveal">
-          <h1>Spot wildfires <span class="glow">before they spread.</span></h1>
-          <p class="lead">
+          <h1 data-edit="s1-title1">Spot wildfires <span class="glow">before they spread.</span></h1>
+          <p data-edit="s1-text1" class="lead">
             FIRO watches the forests of Azad Jammu &amp; Kashmir with cameras and on-device AI.
             When it sees fire, the Forest Department knows within seconds, not hours.
           </p>
           <div class="hero-actions">
-            <a class="btn btn-fire btn-lg" href="/report"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</a>
-            <a class="btn btn-lg" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Live dashboard</a>
-            <a class="btn btn-lg" href="#how-it-works"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> How it works</a>
+            <a data-edit="s1-button1" class="btn btn-fire btn-lg" href="/report"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</a>
+            <a data-edit="s1-button2" class="btn btn-lg" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Live dashboard</a>
+            <a data-edit="s1-button3" class="btn btn-lg" href="#how-it-works"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> How it works</a>
           </div>
         </div>
       </div>
@@ -41,25 +41,25 @@
     <section class="section">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow fire"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> The problem</span>
-          <h2>Today's fire monitoring is too slow</h2>
-          <p>Forest fires in Pakistan's north and in AJK are growing more frequent and more severe. The tools used to find them were not built for early warning.</p>
+          <span data-edit="s2-label1" class="eyebrow fire"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> The problem</span>
+          <h2 data-edit="s2-title1">Today's fire monitoring is too slow</h2>
+          <p data-edit="s2-text1">Forest fires in Pakistan's north and in AJK are growing more frequent and more severe. The tools used to find them were not built for early warning.</p>
         </div>
         <div class="grid grid-3">
           <article class="glass card reveal">
             <div class="icon-badge fire"><i class="fa-solid fa-satellite" aria-hidden="true"></i></div>
-            <h3>Satellites arrive late</h3>
-            <p>Revisit delays, cloud cover and coarse resolution mean small fires often go unseen until they have already grown.</p>
+            <h3 data-edit="s2-heading1">Satellites arrive late</h3>
+            <p data-edit="s2-text2">Revisit delays, cloud cover and coarse resolution mean small fires often go unseen until they have already grown.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge fire"><i class="fa-solid fa-tower-observation" aria-hidden="true"></i></div>
-            <h3>Watchtowers don't scale</h3>
-            <p>Towers need people watching around the clock and are hard to place across steep, remote mountain forest.</p>
+            <h3 data-edit="s2-heading2">Watchtowers don't scale</h3>
+            <p data-edit="s2-text3">Towers need people watching around the clock and are hard to place across steep, remote mountain forest.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge fire"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></div>
-            <h3>Reports come too late</h3>
-            <p>Calls from the public usually arrive once smoke is visible from a village, when the best time to act has passed.</p>
+            <h3 data-edit="s2-heading3">Reports come too late</h3>
+            <p data-edit="s2-text4">Calls from the public usually arrive once smoke is visible from a village, when the best time to act has passed.</p>
           </article>
         </div>
       </div>
@@ -69,30 +69,30 @@
     <section class="section" id="how-it-works">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> How it works</span>
-          <h2>From camera to alert in seconds</h2>
-          <p>All the heavy work happens on the device in the forest. Only a few bytes of results travel over the network.</p>
+          <span data-edit="s3-label1" class="eyebrow"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> How it works</span>
+          <h2 data-edit="s3-title1">From camera to alert in seconds</h2>
+          <p data-edit="s3-text1">All the heavy work happens on the device in the forest. Only a few bytes of results travel over the network.</p>
         </div>
         <div class="steps">
           <article class="glass step reveal">
             <div class="icon-badge"><i class="fa-solid fa-camera" aria-hidden="true"></i></div>
-            <h3>Capture</h3>
-            <p class="text-dim">A tower-mounted camera photographs the forest at regular intervals.</p>
+            <h3 data-edit="s3-heading1">Capture</h3>
+            <p data-edit="s3-text2" class="text-dim">A tower-mounted camera photographs the forest at regular intervals.</p>
           </article>
           <article class="glass step reveal">
             <div class="icon-badge"><i class="fa-solid fa-microchip" aria-hidden="true"></i></div>
-            <h3>Classify on-device</h3>
-            <p class="text-dim">A Raspberry Pi 5 runs a quantised MobileNetV2 model and decides <em>fire</em> or <em>no fire</em>.</p>
+            <h3 data-edit="s3-heading2">Classify on-device</h3>
+            <p data-edit="s3-text3" class="text-dim">A Raspberry Pi 5 runs a quantised MobileNetV2 model and decides <em>fire</em> or <em>no fire</em>.</p>
           </article>
           <article class="glass step reveal">
             <div class="icon-badge"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i></div>
-            <h3>Sync results</h3>
-            <p class="text-dim">Only the label, confidence, location and time are sent to Firebase. No images are uploaded.</p>
+            <h3 data-edit="s3-heading3">Sync results</h3>
+            <p data-edit="s3-text4" class="text-dim">Only the label, confidence, location and time are sent to Firebase. No images are uploaded.</p>
           </article>
           <article class="glass step reveal">
             <div class="icon-badge fire"><i class="fa-solid fa-bell" aria-hidden="true"></i></div>
-            <h3>Alert &amp; respond</h3>
-            <p class="text-dim">The live dashboard lights up and staff forward the alert on WhatsApp with one tap.</p>
+            <h3 data-edit="s3-heading4">Alert &amp; respond</h3>
+            <p data-edit="s3-text5" class="text-dim">The live dashboard lights up and staff forward the alert on WhatsApp with one tap.</p>
           </article>
         </div>
       </div>
@@ -102,40 +102,40 @@
     <section class="section">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow"><i class="fa-solid fa-leaf" aria-hidden="true"></i> Why FIRO</span>
-          <h2>Built for remote forests</h2>
-          <p>Low cost, low power and low bandwidth, so it can go where traditional systems can't.</p>
+          <span data-edit="s4-label1" class="eyebrow"><i class="fa-solid fa-leaf" aria-hidden="true"></i> Why FIRO</span>
+          <h2 data-edit="s4-title1">Built for remote forests</h2>
+          <p data-edit="s4-text1">Low cost, low power and low bandwidth, so it can go where traditional systems can't.</p>
         </div>
         <div class="grid grid-3">
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-brain" aria-hidden="true"></i></div>
-            <h3>On-device AI</h3>
-            <p>Detection runs locally with TensorFlow Lite, so it keeps working when the connection is weak.</p>
+            <h3 data-edit="s4-heading1">On-device AI</h3>
+            <p data-edit="s4-text2">Detection runs locally with TensorFlow Lite, so it keeps working when the connection is weak.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i></div>
-            <h3>Live monitoring dashboard</h3>
-            <p>Every camera on a satellite map, colour-coded by status, with a real-time alert log.</p>
+            <h3 data-edit="s4-heading2">Live monitoring dashboard</h3>
+            <p data-edit="s4-text3">Every camera on a satellite map, colour-coded by status, with a real-time alert log.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
-            <h3>Instant WhatsApp alerts</h3>
-            <p>Alerts go to Forest Department staff with location, map link and time, in English and Urdu.</p>
+            <h3 data-edit="s4-heading3">Instant WhatsApp alerts</h3>
+            <p data-edit="s4-text4">Alerts go to Forest Department staff with location, map link and time, in English and Urdu.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge fire"><i class="fa-solid fa-people-group" aria-hidden="true"></i></div>
-            <h3>Public reporting</h3>
-            <p>Anyone can report smoke or fire with location and a photo. Reports go straight to the response team.</p>
+            <h3 data-edit="s4-heading4">Public reporting</h3>
+            <p data-edit="s4-text5">Anyone can report smoke or fire with location and a photo. Reports go straight to the response team.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-signal" aria-hidden="true"></i></div>
-            <h3>Minimal bandwidth</h3>
-            <p>Compact metadata instead of images keeps costs down on mobile networks.</p>
+            <h3 data-edit="s4-heading5">Minimal bandwidth</h3>
+            <p data-edit="s4-text6">Compact metadata instead of images keeps costs down on mobile networks.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-moon" aria-hidden="true"></i></div>
-            <h3>Works at night</h3>
-            <p>Correctly classified all 12 night-time images of real forest fires near Khuiratta and Nakyal, AJK.</p>
+            <h3 data-edit="s4-heading6">Works at night</h3>
+            <p data-edit="s4-text7">Correctly classified all 12 night-time images of real forest fires near Khuiratta and Nakyal, AJK.</p>
           </article>
         </div>
       </div>
@@ -145,13 +145,13 @@
     <section class="section">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> From the blog</span>
-          <h2>Latest updates</h2>
+          <span data-edit="s5-label1" class="eyebrow"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> From the blog</span>
+          <h2 data-edit="s5-title1">Latest updates</h2>
         </div>
         <div class="grid grid-3" id="latest-posts">
           <div class="empty"><span class="spinner"></span></div>
         </div>
-        <p class="center" style="margin-top:28px;"><a class="btn" href="/blog">All articles <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
+        <p class="center" style="margin-top:28px;"><a data-edit="s5-button1" class="btn" href="/blog">All articles <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
       </div>
     </section>
 
@@ -160,12 +160,12 @@
       <div class="container">
         <div class="glass cta-band reveal">
           <div>
-            <h2>See smoke or fire in the forest?</h2>
-            <p>Report it in under a minute with your location and a photo. If anyone is in danger, call Rescue 1122 first.</p>
+            <h2 data-edit="s6-title1">See smoke or fire in the forest?</h2>
+            <p data-edit="s6-text1">Report it in under a minute with your location and a photo. If anyone is in danger, call Rescue 1122 first.</p>
           </div>
           <div class="hero-actions" style="margin-top:0;">
-            <a class="btn btn-fire btn-lg" href="/report"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</a>
-            <a class="btn btn-lg" href="tel:1122"><i class="fa-solid fa-phone" aria-hidden="true"></i> Call 1122</a>
+            <a data-edit="s6-button1" class="btn btn-fire btn-lg" href="/report"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</a>
+            <a data-edit="s6-button2" class="btn btn-lg" href="tel:1122"><i class="fa-solid fa-phone" aria-hidden="true"></i> Call 1122</a>
           </div>
         </div>
       </div>

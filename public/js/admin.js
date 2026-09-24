@@ -5,17 +5,20 @@
  * "admins" collection. Firestore rules enforce the same check
  * (see firestore.rules), so hiding the page is not the only guard.
  *
- * Manages: fire reports, contact messages and blog posts.
+ * Tabs: contact messages · blog posts · website content (text on
+ * the public pages) · control-room team. Fire reports are handled
+ * in the control room (/incidents).
  * ─────────────────────────────────────────────────────────────
  */
 
-import { initFirebase, fireLogsPath, COLLECTIONS } from "/js/firebase-init.js";
-import { esc, isActiveFire } from "/js/common.js";
+import { initFirebase, COLLECTIONS } from "/js/firebase-init.js";
+import { esc } from "/js/common.js";
 import { initJungleBackground } from "/js/jungle-bg.js";
 import { toast, formatDate } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { compressImage } from "/js/image-utils.js";
 import { STARTER_POSTS } from "/js/blog-data.js";
+import { applyContent, docIdFor, editableElements, loadSanitizer } from "/js/content.js";
 import { onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
@@ -26,11 +29,6 @@ import {
 initJungleBackground();
 
 const $ = (id) => document.getElementById(id);
-
-const REPORT_STATUSES = ["new", "reviewing", "verified", "resolved", "dismissed"];
-const OPEN_STATUSES = ["new", "reviewing", "verified"];
-const REPORT_TYPES = { smoke: "Smoke", small_fire: "Small fire", large_fire: "Large fire", near_homes: "Fire near homes" };
-const STATUS_LABELS = { new: "New", reviewing: "Reviewing", verified: "Verified fire", resolved: "Resolved", dismissed: "Dismissed" };
 
 const timeText = (ms) => (ms ? new Date(ms).toLocaleString() : "--");
 
@@ -50,12 +48,14 @@ try {
   $("state-loading").innerHTML = `<p class="text-dim">Could not load configuration from /api/config.</p>`;
   throw err;
 }
-const { auth, db, config, settings } = firebase;
+const { auth, db } = firebase;
 
-$("logout-btn").addEventListener("click", async () => {
+async function logout() {
   await signOut(auth);
   window.location.replace("/login?next=/admin");
-});
+}
+$("logout-btn").addEventListener("click", logout);
+$("denied-logout").addEventListener("click", logout);
 
 const user = await new Promise((resolve) => {
   const unsubscribe = onAuthStateChanged(auth, (u) => { unsubscribe(); resolve(u); });
@@ -65,9 +65,6 @@ if (!user || user.isAnonymous) {
   await halt();
 }
 
-$("logout-btn").hidden = false;
-$("admin-user").innerHTML = `${esc(user.email || "")}<br /><span class="text-muted">Admin</span>`;
-
 let isAdmin = false;
 try {
   isAdmin = (await getDoc(doc(db, COLLECTIONS.admins, user.uid))).exists();
@@ -76,28 +73,39 @@ try {
 }
 
 if (!isAdmin) {
-  $("admin-user").innerHTML = esc(user.email || "");
   $("denied-email").textContent = user.email || "this account";
-  $("denied-uid").textContent = user.uid;
-  $("copy-uid").addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(user.uid); toast("UID copied", "success"); }
-    catch { toast("Copy failed. Select the UID and copy it manually.", "error"); }
-  });
   show("denied");
   await halt();
 }
 
 show("admin");
 
+/* ── Profile menu ───────────────────────────────────────────── */
+$("profile").hidden = false;
+$("profile-email").textContent = user.email || "";
+const profileBtn = $("profile-btn"), profileMenu = $("profile-menu");
+function setMenu(open) {
+  profileMenu.hidden = !open;
+  profileBtn.setAttribute("aria-expanded", String(open));
+}
+profileBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(profileMenu.hidden); });
+document.addEventListener("click", (e) => { if (!profileMenu.hidden && !profileMenu.contains(e.target)) setMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !profileMenu.hidden) { setMenu(false); profileBtn.focus(); } });
+
 /* ── Tabs ───────────────────────────────────────────────────── */
+const TABS = [...document.querySelectorAll(".tab")].map((t) => t.dataset.tab);
+const tabHooks = {};
+let currentTab = "messages";
 function openTab(name) {
+  if (!TABS.includes(name)) name = "messages";
+  if (currentTab === "content" && name !== "content" && !confirmLeaveContent()) return;
+  currentTab = name;
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
   document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== name; });
   try { sessionStorage.setItem("firo_admin_tab", name); } catch {}
+  tabHooks[name]?.();
 }
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => openTab(t.dataset.tab)));
-document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => openTab(b.dataset.goto)));
-try { const saved = sessionStorage.getItem("firo_admin_tab"); if (saved) openTab(saved); } catch {}
 
 /* ── Modals ─────────────────────────────────────────────────── */
 function openModal(id) { $(id).classList.add("open"); }
@@ -115,9 +123,6 @@ function setBadge(id, n) {
   el.hidden = !n;
 }
 
-/* ── Data ───────────────────────────────────────────────────── */
-let reports = [], messages = [], posts = [];
-
 function listenerError(what) {
   return (err) => {
     console.error(`[FIRO] ${what} listener error:`, err);
@@ -125,136 +130,14 @@ function listenerError(what) {
   };
 }
 
-onSnapshot(query(collection(db, COLLECTIONS.reports), orderBy("created_ms", "desc"), limit(300)), (snap) => {
-  reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  renderReports();
-  renderOverview();
-}, listenerError("fire reports"));
-
+/* ── Messages ───────────────────────────────────────────────── */
+let messages = [];
 onSnapshot(query(collection(db, COLLECTIONS.messages), orderBy("created_ms", "desc"), limit(300)), (snap) => {
   messages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  setBadge("count-messages", messages.filter((m) => m.status !== "read").length);
   renderMessages();
-  renderOverview();
 }, listenerError("messages"));
 
-onSnapshot(collection(db, COLLECTIONS.posts), (snap) => {
-  posts = snap.docs.map((d) => ({ slug: d.id, ...d.data() }))
-    .sort((a, b) => (b.published_at || 0) - (a.published_at || 0));
-  renderPosts();
-  renderOverview();
-}, listenerError("blog posts"));
-
-onSnapshot(collection(db, ...fireLogsPath(config)), (snap) => {
-  const cameras = new Set();
-  snap.forEach((d) => { const e = d.data(); if (isActiveFire(e)) cameras.add(e.camera_location || d.id); });
-  $("ov-fires").textContent = cameras.size;
-}, listenerError("fire logs"));
-
-/* ── Overview ───────────────────────────────────────────────── */
-function renderOverview() {
-  const newReports = reports.filter((r) => r.status === "new").length;
-  const unread = messages.filter((m) => m.status !== "read").length;
-  $("ov-reports").textContent = newReports;
-  $("ov-messages").textContent = unread;
-  $("ov-posts").textContent = posts.filter((p) => p.published).length;
-  setBadge("count-reports", newReports);
-  setBadge("count-messages", unread);
-
-  $("ov-report-list").innerHTML = reports.slice(0, 5).map((r) => `
-    <div class="overview-row">
-      <span><span class="pill pill-${esc(r.status)}">${esc(STATUS_LABELS[r.status] || r.status)}</span>
-        ${esc(REPORT_TYPES[r.type] || r.type)} · ${esc(r.place)}</span>
-      <span class="text-muted">${esc(timeText(r.created_ms))}</span>
-    </div>`).join("") || `<div class="empty">No reports yet.</div>`;
-
-  $("ov-message-list").innerHTML = messages.slice(0, 5).map((m) => `
-    <div class="overview-row">
-      <span><span class="pill pill-${m.status === "read" ? "read" : "unread"}">${m.status === "read" ? "Read" : "Unread"}</span>
-        ${esc(m.name)} · ${esc(m.subject)}</span>
-      <span class="text-muted">${esc(timeText(m.created_ms))}</span>
-    </div>`).join("") || `<div class="empty">No messages yet.</div>`;
-}
-
-/* ── Fire reports ───────────────────────────────────────────── */
-$("report-filter").addEventListener("change", renderReports);
-
-function renderReports() {
-  const filter = $("report-filter").value;
-  const list = reports.filter((r) =>
-    !filter ? true : filter === "open" ? OPEN_STATUSES.includes(r.status) : r.status === filter);
-
-  $("report-list").innerHTML = list.map((r) => {
-    const hasLoc = typeof r.lat === "number" && typeof r.lon === "number";
-    const mapUrl = hasLoc ? `https://www.google.com/maps?q=${r.lat},${r.lon}` : "";
-    return `
-    <article class="glass item" data-id="${esc(r.id)}">
-      <div class="item-top">
-        <div class="item-title"><i class="fa-solid fa-fire text-fire" aria-hidden="true"></i>
-          ${esc(REPORT_TYPES[r.type] || r.type)} · ${esc(r.place)}</div>
-        <span class="pill pill-${esc(r.status)}">${esc(STATUS_LABELS[r.status] || r.status)}</span>
-      </div>
-      <div class="item-meta">
-        <span><i class="fa-regular fa-clock"></i>${esc(timeText(r.created_ms))}</span>
-        <span><i class="fa-solid fa-hashtag"></i>${esc(r.id.slice(0, 8).toUpperCase())}</span>
-        ${hasLoc ? `<span><i class="fa-solid fa-location-dot"></i><a href="${mapUrl}" target="_blank" rel="noopener">${r.lat}, ${r.lon}</a>${r.accuracy_m ? ` (±${esc(r.accuracy_m)} m)` : ""}</span>` : `<span><i class="fa-solid fa-location-dot"></i>No map location</span>`}
-        ${r.name ? `<span><i class="fa-solid fa-user"></i>${esc(r.name)}</span>` : ""}
-        ${r.phone ? `<span><i class="fa-solid fa-phone"></i><a href="tel:${esc(r.phone)}">${esc(r.phone)}</a></span>` : ""}
-      </div>
-      ${r.description ? `<div class="item-body">${esc(r.description)}</div>` : ""}
-      ${r.photo ? `<img class="thumb" src="${esc(r.photo)}" alt="Report photo" data-photo="${esc(r.id)}" />` : ""}
-      <div class="item-actions">
-        <label class="sr-only" for="st-${esc(r.id)}">Status</label>
-        <select class="select select-sm" id="st-${esc(r.id)}" data-status="${esc(r.id)}">
-          ${REPORT_STATUSES.map((s) => `<option value="${s}" ${s === r.status ? "selected" : ""}>${STATUS_LABELS[s]}</option>`).join("")}
-        </select>
-        ${settings.whatsappNumber ? `<button class="btn btn-sm" data-forward="${esc(r.id)}"><i class="fa-brands fa-whatsapp"></i> Forward</button>` : ""}
-        <button class="btn btn-sm btn-danger" data-delete-report="${esc(r.id)}"><i class="fa-solid fa-trash"></i> Delete</button>
-      </div>
-    </article>`;
-  }).join("") || `<div class="glass empty"><i class="fa-solid fa-inbox" aria-hidden="true"></i>No reports in this view.</div>`;
-}
-
-$("report-list").addEventListener("change", async (e) => {
-  const id = e.target.dataset.status;
-  if (!id) return;
-  try {
-    const r = reports.find((x) => x.id === id) || {};
-    const status = e.target.value, now = Date.now();
-    const data = { status, updated_ms: now, handled_by: user.email || user.uid };
-    if (status !== "new" && !r.acknowledged_ms) data.acknowledged_ms = now;
-    if (status === "resolved" || status === "dismissed") data.resolved_ms = now;
-    await updateDoc(doc(db, COLLECTIONS.reports, id), data);
-    toast("Status updated", "success");
-  } catch (err) { console.error(err); toast("Update failed", "error"); }
-});
-
-$("report-list").addEventListener("click", async (e) => {
-  const photo = e.target.closest("[data-photo]");
-  if (photo) { $("photo-full").src = photo.src; openModal("photo-modal"); return; }
-
-  const fwd = e.target.closest("[data-forward]");
-  if (fwd) {
-    const r = reports.find((x) => x.id === fwd.dataset.forward);
-    const text = [
-      `🔥 Fire report (${REPORT_TYPES[r.type] || r.type}) — Ref ${r.id.slice(0, 8).toUpperCase()}`,
-      `Place: ${r.place}`,
-      typeof r.lat === "number" ? `Map: https://www.google.com/maps?q=${r.lat},${r.lon}` : "",
-      r.description ? `Details: ${r.description}` : "",
-      r.name || r.phone ? `Reporter: ${[r.name, r.phone].filter(Boolean).join(", ")}` : "",
-      `Reported: ${timeText(r.created_ms)}`,
-    ].filter(Boolean).join("\n");
-    window.open(`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(text)}`, "_blank");
-    return;
-  }
-
-  const del = e.target.closest("[data-delete-report]");
-  if (del && confirm("Delete this report permanently?")) {
-    try { await deleteDoc(doc(db, COLLECTIONS.reports, del.dataset.deleteReport)); toast("Report deleted", "success"); }
-    catch (err) { console.error(err); toast("Delete failed", "error"); }
-  }
-});
-
-/* ── Messages ───────────────────────────────────────────────── */
 $("message-filter").addEventListener("change", renderMessages);
 
 function renderMessages() {
@@ -303,8 +186,38 @@ $("message-list").addEventListener("click", async (e) => {
 });
 
 /* ── Blog posts ─────────────────────────────────────────────── */
+let posts = [];
+let blogChecked = false;
+
+onSnapshot(collection(db, COLLECTIONS.posts), (snap) => {
+  posts = snap.docs.map((d) => ({ slug: d.id, ...d.data() }))
+    .sort((a, b) => (b.published_at || 0) - (a.published_at || 0));
+  renderPosts();
+  if (!blogChecked) { blogChecked = true; takeOverBlog(); }
+}, listenerError("blog posts"));
+
+/**
+ * The website shows built-in starter articles until the admin panel manages the blog.
+ * The first time an admin opens the panel, copy them into Firestore (if there are no
+ * posts yet) so every article can be edited or deleted here, and mark the blog as managed.
+ */
+async function takeOverBlog() {
+  try {
+    const ref = doc(db, COLLECTIONS.content, "blog");
+    const snap = await getDoc(ref);
+    if (snap.exists() && snap.data().posts_managed) return;
+    const missing = posts.length ? [] : STARTER_POSTS;
+    const batch = writeBatch(db);
+    missing.forEach((p) => batch.set(doc(db, COLLECTIONS.posts, p.slug), { ...p, updated_ms: Date.now() }));
+    batch.set(ref, { posts_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
+    await batch.commit();
+    if (missing.length) toast(`The ${missing.length} built-in articles are now listed in Blog, so you can edit or delete them.`, "info", 7000);
+  } catch (err) {
+    console.error("[FIRO] Could not set up blog management:", err);
+  }
+}
+
 function renderPosts() {
-  $("blog-note").hidden = posts.length > 0;
   $("post-rows").innerHTML = posts.map((p) => `
     <tr>
       <td><strong>${esc(p.title)}</strong><br /><span class="text-muted" style="font-size:.85rem;">/blog/${esc(p.slug)}</span></td>
@@ -314,9 +227,9 @@ function renderPosts() {
         ${p.published ? `<a class="btn btn-sm" href="/blog/${encodeURIComponent(p.slug)}" target="_blank" rel="noopener" title="View" aria-label="View post"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
         <button class="btn btn-sm" data-publish="${esc(p.slug)}">${p.published ? "Unpublish" : "Publish"}</button>
         <button class="btn btn-sm" data-edit="${esc(p.slug)}"><i class="fa-solid fa-pen"></i> Edit</button>
-        <button class="btn btn-sm btn-danger" data-delete-post="${esc(p.slug)}" title="Delete" aria-label="Delete post"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-sm btn-danger" data-delete-post="${esc(p.slug)}"><i class="fa-solid fa-trash"></i> Delete</button>
       </td>
-    </tr>`).join("") || `<tr><td colspan="4" class="empty">No posts yet.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="4" class="empty">No posts yet. Press <strong>New post</strong> to write one.</td></tr>`;
 }
 
 $("post-rows").addEventListener("click", async (e) => {
@@ -337,22 +250,12 @@ $("post-rows").addEventListener("click", async (e) => {
   if (edit) { openEditor(posts.find((x) => x.slug === edit.dataset.edit)); return; }
 
   const del = e.target.closest("[data-delete-post]");
-  if (del && confirm(`Delete the post "${del.dataset.deletePost}" permanently?`)) {
+  if (del) {
+    const p = posts.find((x) => x.slug === del.dataset.deletePost);
+    if (!confirm(`Delete "${p?.title || del.dataset.deletePost}" permanently?`)) return;
     try { await deleteDoc(doc(db, COLLECTIONS.posts, del.dataset.deletePost)); toast("Post deleted", "success"); }
     catch (err) { console.error(err); toast("Delete failed", "error"); }
   }
-});
-
-$("import-starter").addEventListener("click", async () => {
-  const missing = STARTER_POSTS.filter((s) => !posts.some((p) => p.slug === s.slug));
-  if (!missing.length) return toast("Starter posts are already imported", "info");
-  if (!confirm(`Import ${missing.length} starter post(s) into Firestore?`)) return;
-  try {
-    const batch = writeBatch(db);
-    missing.forEach((p) => batch.set(doc(db, COLLECTIONS.posts, p.slug), { ...p, updated_ms: Date.now() }));
-    await batch.commit();
-    toast(`Imported ${missing.length} post(s)`, "success");
-  } catch (err) { console.error(err); toast("Import failed", "error"); }
 });
 
 /* ── Post editor ────────────────────────────────────────────── */
@@ -452,10 +355,284 @@ $("post-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ── Website content ────────────────────────────────────────── */
+// Each page's text lives in site_content/{id}; the footer is shared by every page.
+const CONTENT_PAGES = [
+  { id: "home",    label: "Home",          url: "/" },
+  { id: "about",   label: "About",         url: "/about" },
+  { id: "blog",    label: "Blog",          url: "/blog" },
+  { id: "report",  label: "Report a Fire", url: "/report" },
+  { id: "contact", label: "Contact",       url: "/contact" },
+  { id: "footer",  label: "Footer",        url: "/" },
+];
+const KIND_LABELS = {
+  title: "Heading", heading: "Title", text: "Text", item: "List item", button: "Button", label: "Label",
+  number: "Number", caption: "Caption", role: "Role", initials: "Initials",
+  about: "About text", col: "Column heading", tagline: "Tagline",
+};
+
+const content = {
+  page: null,           // current CONTENT_PAGES entry
+  saved: {},            // key -> saved value (from Firestore)
+  savedDoc: {},         // the whole saved document
+  drafts: {},           // key -> value typed in the form ("" = back to the original)
+  elements: new Map(),  // key -> element in the preview frame
+  frameReady: false,
+  view: "desktop",
+  sanitize: null,
+};
+
+/** Value to store for a field: null means "use the original text". */
+function storedValue(key) {
+  const el = content.elements.get(key);
+  const v = (content.drafts[key] ?? content.saved[key] ?? "").trim();
+  return !v || v === el?.firoDefault ? null : v;
+}
+const contentDirty = () => [...content.elements.keys()].some((k) => storedValue(k) !== (content.saved[k] ?? null));
+
+function confirmLeaveContent() {
+  return !contentDirty() || confirm("You have unsaved changes to the website text. Leave without saving?");
+}
+window.addEventListener("beforeunload", (e) => { if (contentDirty()) { e.preventDefault(); e.returnValue = ""; } });
+
+function renderPagePills() {
+  const dirty = contentDirty();
+  $("content-pages").innerHTML = CONTENT_PAGES.map((p) => `
+    <button type="button" class="page-pill ${p === content.page ? "active" : ""}" data-page="${p.id}" role="tab"
+      aria-selected="${p === content.page}">${esc(p.label)}${p === content.page && dirty ? '<span class="dot" title="Unsaved changes"></span>' : ""}</button>`).join("");
+}
+$("content-pages").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-page]");
+  if (!b || b.dataset.page === content.page?.id || !confirmLeaveContent()) return;
+  openContentPage(CONTENT_PAGES.find((p) => p.id === b.dataset.page));
+});
+
+function fieldLabel(key) {
+  const m = key.match(/^(?:s\d+-)?([a-z]+?)(\d*)$/);
+  const kind = m ? m[1] : key;
+  return `${KIND_LABELS[kind] || "Text"}${m && m[2] && kind !== "col" ? ` ${m[2]}` : ""}`;
+}
+
+const plain = (html) => { const d = document.createElement("div"); d.innerHTML = html; return d.textContent.trim(); };
+const frameDoc = () => $("content-frame").contentDocument;
+// The footer's fields belong to the "footer" document; everything else to the page
+const belongsTo = (el, page) => docIdFor(el, page.id === "footer" ? "__page" : page.id) === page.id;
+
+async function openContentPage(page) {
+  content.page = page;
+  content.drafts = {};
+  content.elements = new Map();
+  content.frameReady = false;
+  content.savedDoc = {};
+  content.saved = {};
+  renderPagePills();
+  updateContentBar();
+  $("content-open").href = page.url;
+  $("content-fields").innerHTML = `<div class="empty"><span class="spinner"></span></div>`;
+  $("frame-loading").hidden = false;
+
+  const [snap] = await Promise.all([
+    getDoc(doc(db, COLLECTIONS.content, page.id)).catch((err) => { console.error(err); return null; }),
+    loadFrame(page.url),
+  ]);
+  if (content.page !== page) return;   // another page was chosen meanwhile
+  content.savedDoc = snap?.exists() ? snap.data() : {};
+  content.saved = {};
+  for (const [k, v] of Object.entries(content.savedDoc.fields || {})) if (typeof v === "string" && v.trim()) content.saved[k] = v;
+  renderContentFields();
+  updateContentBar();
+  previewDrafts();
+}
+
+function loadFrame(url) {
+  const frame = $("content-frame");
+  return new Promise((resolve) => {
+    frame.onload = async () => {
+      const win = frame.contentWindow;
+      for (let i = 0; i < 80 && !win.__firoContent; i++) await new Promise((r) => setTimeout(r, 100));
+      try { await win.__firoContent; } catch {}
+      content.frameReady = true;
+      $("frame-loading").hidden = true;
+      // Show every section straight away (the page fades them in while scrolling)
+      win.document.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
+      const style = win.document.createElement("style");
+      style.textContent = ".firo-edit-focus{outline:2px dashed #f47a1f!important;outline-offset:4px;border-radius:4px;}";
+      win.document.head.appendChild(style);
+      resolve();
+    };
+    frame.src = `${url}${url.includes("?") ? "&" : "?"}preview=${Date.now()}`;
+    sizeFrame();
+  });
+}
+
+function sizeFrame() {
+  const box = $("frame-box"), frame = $("content-frame");
+  if (!box.clientWidth) return;
+  const width = content.view === "mobile" ? 390 : 1280;
+  const scale = Math.min(1, box.clientWidth / width);
+  frame.style.width = `${width}px`;
+  frame.style.height = `${box.clientHeight / scale}px`;
+  frame.style.transform = `scale(${scale})`;
+  frame.style.left = `${Math.max(0, (box.clientWidth - width * scale) / 2)}px`;
+}
+window.addEventListener("resize", sizeFrame);
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => {
+  content.view = b.dataset.view;
+  document.querySelectorAll("[data-view]").forEach((x) => x.classList.toggle("on", x === b));
+  sizeFrame();
+}));
+
+function renderContentFields() {
+  const page = content.page;
+  const fdoc = frameDoc();
+  const groups = [];
+  for (const el of editableElements(fdoc).filter((x) => belongsTo(x, page))) {
+    content.elements.set(el.dataset.edit, el);
+    const section = el.closest("#site-footer") || el.closest("section") || fdoc.body;
+    let g = groups.find((x) => x.section === section);
+    if (!g) {
+      const head = [...section.querySelectorAll("[data-edit]")].find((x) => /^H[12]$/.test(x.tagName));
+      g = { section, title: page.id === "footer" ? "Footer (every page)" : head ? plain(head.firoDefault) : `Section ${groups.length + 1}`, els: [] };
+      groups.push(g);
+    }
+    g.els.push(el);
+  }
+
+  $("content-fields").innerHTML = groups.map((g) => `
+    <div class="content-group">
+      <h3>${esc(g.title)}</h3>
+      ${g.els.map((el) => {
+        const key = el.dataset.edit;
+        const value = content.saved[key] ?? el.firoDefault;
+        const hidden = !el.getClientRects().length;
+        return `
+        <div class="cfield" data-key="${esc(key)}">
+          <div class="cfield-head">
+            <label for="cf-${esc(key)}">${esc(fieldLabel(key))}</label>
+            ${hidden ? `<span class="note">(shown only in some situations)</span>` : ""}
+            <span class="edited" hidden>Edited</span>
+            <button type="button" data-reset="${esc(key)}" hidden>Reset</button>
+          </div>
+          <textarea class="textarea" id="cf-${esc(key)}" data-field="${esc(key)}" rows="1">${esc(value)}</textarea>
+          ${el.firoMode === "html" ? `<span class="hint">Formatting allowed: &lt;strong&gt;bold&lt;/strong&gt;, &lt;em&gt;italic&lt;/em&gt;, &lt;a href="…"&gt;link&lt;/a&gt;, &lt;br&gt;</span>` : ""}
+        </div>`;
+      }).join("")}
+    </div>`).join("") || `<div class="empty">No editable text on this page.</div>`;
+  for (const key of content.elements.keys()) markField(key);
+  $("content-fields").querySelectorAll("textarea[data-field]").forEach(autosize);
+}
+
+/** Grow a text box to fit its text. */
+function autosize(ta) {
+  ta.style.height = "auto";
+  ta.style.height = `${ta.scrollHeight + 2}px`;
+}
+
+async function previewDrafts() {
+  if (!content.frameReady || !content.elements.size) return;
+  const values = {};
+  const els = [...content.elements.values()];
+  if (!content.sanitize && els.some((el) => el.firoMode === "html")) content.sanitize = await loadSanitizer();
+  for (const [key, el] of content.elements) {
+    const v = storedValue(key);
+    if (v != null) values[key] = el.firoMode === "html" ? content.sanitize(v) : v;
+  }
+  const pageId = content.page.id === "footer" ? "__page" : content.page.id;
+  applyContent({ [content.page.id]: values }, pageId, frameDoc(), new Set(els));
+}
+
+function updateContentBar() {
+  const dirty = contentDirty();
+  $("content-save").disabled = !dirty;
+  $("content-discard").disabled = !dirty;
+  const d = content.savedDoc || {};
+  $("content-status").textContent = dirty ? "Unsaved changes"
+    : d.updated_ms && d.fields ? `Last saved ${timeText(d.updated_ms)}${d.updated_by ? ` by ${d.updated_by}` : ""}` : "";
+  renderPagePills();
+}
+
+function markField(key) {
+  const f = document.querySelector(`.cfield[data-key="${CSS.escape(key)}"]`);
+  if (!f) return;
+  const edited = storedValue(key) != null;
+  f.querySelector(".edited").hidden = !edited;
+  f.querySelector("[data-reset]").hidden = !edited;
+}
+
+$("content-fields").addEventListener("input", (e) => {
+  const key = e.target.dataset.field;
+  if (!key) return;
+  content.drafts[key] = e.target.value;
+  autosize(e.target);
+  markField(key);
+  updateContentBar();
+  previewDrafts();
+});
+
+$("content-fields").addEventListener("focusin", (e) => {
+  const el = content.elements.get(e.target.dataset.field);
+  if (!el) return;
+  frameDoc().querySelectorAll(".firo-edit-focus").forEach((x) => x.classList.remove("firo-edit-focus"));
+  el.classList.add("firo-edit-focus");
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+});
+
+$("content-fields").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-reset]");
+  if (!b) return;
+  const key = b.dataset.reset;
+  const ta = $(`cf-${key}`);
+  ta.value = content.elements.get(key).firoDefault;
+  autosize(ta);
+  content.drafts[key] = "";
+  markField(key);
+  updateContentBar();
+  previewDrafts();
+  ta.focus();
+});
+
+$("content-discard").addEventListener("click", () => {
+  if (!confirm("Discard your unsaved changes?")) return;
+  content.drafts = {};
+  renderContentFields();
+  updateContentBar();
+  previewDrafts();
+});
+
+$("content-save").addEventListener("click", async () => {
+  const fields = {};
+  if (!content.sanitize) content.sanitize = await loadSanitizer();
+  for (const [key, el] of content.elements) {
+    const v = storedValue(key);
+    if (v != null) fields[key] = el.firoMode === "html" ? content.sanitize(v) : v;
+  }
+  const data = { fields, updated_ms: Date.now(), updated_by: user.email || user.uid };
+  if (content.savedDoc.posts_managed) data.posts_managed = true;
+  $("content-save").disabled = true;
+  try {
+    await setDoc(doc(db, COLLECTIONS.content, content.page.id), data);
+    content.savedDoc = data;
+    content.saved = { ...fields };
+    content.drafts = {};
+    renderContentFields();
+    updateContentBar();
+    toast("Website updated", "success");
+  } catch (err) {
+    console.error(err);
+    toast("Save failed. Check that the latest security rules are published.", "error", 8000);
+    updateContentBar();
+  }
+});
+
+tabHooks.content = () => {
+  if (!content.page) openContentPage(CONTENT_PAGES[0]);
+  else sizeFrame();
+};
+
 /* ── Team (control-room staff) ─────────────────────────────── */
-let staff = [];
+let requests = [];
 onSnapshot(collection(db, COLLECTIONS.staff), (snap) => {
-  staff = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => (b.added_ms || 0) - (a.added_ms || 0));
+  const staff = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => (b.added_ms || 0) - (a.added_ms || 0));
   $("staff-rows").innerHTML = staff.map((m) => `
     <tr>
       <td><strong>${esc(m.email || m.name || "—")}</strong></td>
@@ -465,11 +642,40 @@ onSnapshot(collection(db, COLLECTIONS.staff), (snap) => {
     </tr>`).join("") || `<tr><td colspan="4" class="empty">No staff yet. Admins already have full access.</td></tr>`;
 }, listenerError("team"));
 
+onSnapshot(collection(db, COLLECTIONS.requests), (snap) => {
+  requests = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => (b.requested_ms || 0) - (a.requested_ms || 0));
+  setBadge("count-requests", requests.length);
+  $("request-rows").innerHTML = requests.map((r) => `
+    <tr>
+      <td><strong>${esc(r.email || "—")}</strong><br /><span class="text-muted" style="font-family:ui-monospace,Consolas,monospace;font-size:.8rem;">${esc(r.uid)}</span></td>
+      <td class="text-dim">${esc(timeText(r.requested_ms))}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-sm btn-leaf" data-approve="${esc(r.uid)}"><i class="fa-solid fa-check"></i> Approve</button>
+        <button class="btn btn-sm btn-danger" data-decline="${esc(r.uid)}"><i class="fa-solid fa-xmark"></i> Decline</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="3" class="empty">No pending requests.</td></tr>`;
+}, listenerError("access requests"));
+
+$("request-rows").addEventListener("click", async (e) => {
+  const ok = e.target.closest("[data-approve]"), no = e.target.closest("[data-decline]");
+  const uid = ok?.dataset.approve || no?.dataset.decline;
+  if (!uid) return;
+  const r = requests.find((x) => x.uid === uid) || {};
+  if (no && !confirm(`Decline the request from ${r.email || uid}?`)) return;
+  try {
+    const batch = writeBatch(db);
+    if (ok) batch.set(doc(db, COLLECTIONS.staff, uid), { email: r.email || "", added_ms: Date.now(), added_by: user.email || user.uid });
+    batch.delete(doc(db, COLLECTIONS.requests, uid));
+    await batch.commit();
+    toast(ok ? `${r.email || "User"} can now use the control room` : "Request declined", "success");
+  } catch (err) { console.error(err); toast("Could not update the request. Check the security rules are published.", "error"); }
+});
+
 $("staff-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const uid = $("staff-uid").value.trim();
   const label = $("staff-email").value.trim();
-  if (!/^[A-Za-z0-9_-]{6,128}$/.test(uid)) return toast("That doesn't look like a user ID. Copy it from the /incidents page.", "error");
+  if (!/^[A-Za-z0-9_-]{6,128}$/.test(uid)) return toast("That doesn't look like a user ID.", "error");
   try {
     await setDoc(doc(db, COLLECTIONS.staff, uid), { email: label, added_ms: Date.now(), added_by: user.email || user.uid });
     $("staff-form").reset();
@@ -483,3 +689,8 @@ $("staff-rows").addEventListener("click", async (e) => {
   try { await deleteDoc(doc(db, COLLECTIONS.staff, b.dataset.removeStaff)); toast("Removed from the team", "success"); }
   catch (err) { console.error(err); toast("Could not remove staff.", "error"); }
 });
+
+/* ── Start on the last tab used ─────────────────────────────── */
+let startTab = "messages";
+try { startTab = sessionStorage.getItem("firo_admin_tab") || "messages"; } catch {}
+openTab(startTab);

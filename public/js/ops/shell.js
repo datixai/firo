@@ -8,7 +8,9 @@
  */
 
 import { signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { esc } from "/js/common.js";
+import { COLLECTIONS } from "/js/firebase-init.js";
 
 export const PAGES = [
   { key: "overview",  href: "/dashboard", label: "Overview",        icon: "fa-gauge-high" },
@@ -47,6 +49,7 @@ function beep() {
  * ctx: result of startOps(); active: page key.
  */
 export function renderShell(active, ctx) {
+  if (!ctx.isStaff) initAccessRequest(ctx);
   const bar = document.getElementById("topbar");
   bar.className = "topbar";
   bar.innerHTML = `
@@ -203,11 +206,39 @@ export function renderShell(active, ctx) {
 }
 
 /** Locked notice for staff-only sections. */
+/* ── Access requests (signed-in users who are not staff yet) ── */
+let requestState = "none";   // none | sent
+
+function requestHtml() {
+  return requestState === "sent"
+    ? `<p class="muted req-access" style="font-size:.85rem;"><i class="fa-solid fa-clock"></i> Access requested. An admin will review it.</p>`
+    : `<p class="req-access"><button class="btn btn-sm" data-request-access><i class="fa-solid fa-key"></i> Request access</button></p>`;
+}
+
+function initAccessRequest(ctx) {
+  const ref = doc(ctx.db, COLLECTIONS.requests, ctx.user.uid);
+  const refresh = () => document.querySelectorAll(".req-access").forEach((el) => { el.outerHTML = requestHtml(); });
+  getDoc(ref).then((snap) => { if (snap.exists()) { requestState = "sent"; refresh(); } }).catch(() => {});
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-request-access]");
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await setDoc(ref, { email: ctx.user.email || "", requested_ms: Date.now() });
+      requestState = "sent";
+      refresh();
+    } catch (err) {
+      console.error("[FIRO] Access request failed:", err);
+      btn.disabled = false;
+      btn.textContent = "Could not send. Try again";
+    }
+  });
+}
+
 export function lockedHtml(ctx, what = "citizen reports") {
   return `<div class="locked">
     <i class="fa-solid fa-lock" style="font-size:1.4rem;color:var(--ink-3);"></i>
     <p>Only control-room staff can see ${esc(what)}.</p>
-    <p class="muted" style="font-size:.85rem;">An admin can add you as staff in the Admin panel (Team tab) using this ID:</p>
-    <div class="uid">${esc(ctx.user.uid)}</div>
+    ${requestHtml()}
   </div>`;
 }

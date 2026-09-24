@@ -32,19 +32,25 @@ export const COLLECTIONS = {
   posts:    "blog_posts",        // blog articles (doc id = slug)
   admins:   "admins",            // doc id = admin user's UID
   staff:    "staff",             // doc id = control-room operator's UID
+  requests: "access_requests",   // control-room access requests, doc id = requester's UID
+  content:  "site_content",      // website text edited in the admin panel, doc id = page
 };
 
 // ─────────────────────────────────────────────────────────────
 let _firebaseApp   = null;
-let _configCache   = null;
+let _configPromise = null;
 
 /**
  * Fetch runtime config from /api/config.
  * Result is cached so only one network request is ever made.
  */
-async function fetchConfig() {
-  if (_configCache) return _configCache;
+function fetchConfig() {
+  // Share one request between callers; retry on the next call if it failed
+  if (!_configPromise) _configPromise = loadConfig().catch((err) => { _configPromise = null; throw err; });
+  return _configPromise;
+}
 
+async function loadConfig() {
   const res = await fetch(CONFIG_ENDPOINT, { cache: "no-store" });
   if (!res.ok) {
     let detail = "";
@@ -54,8 +60,7 @@ async function fetchConfig() {
     );
   }
 
-  _configCache = await res.json();
-  return _configCache;
+  return res.json();
 }
 
 /**

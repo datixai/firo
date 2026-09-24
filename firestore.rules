@@ -14,6 +14,8 @@ rules_version = '2';
 //   blog_posts        blog articles, id = slug (public reads published, admins write)
 //   admins            one doc per admin, id = user UID (created by hand in the console)
 //   staff             control-room operators, id = user UID (managed by admins in /admin → Team)
+//   access_requests   "Request access" from the control room, id = user UID (admins approve in Team)
+//   site_content      website text edited in /admin → Website content, id = page
 // ─────────────────────────────────────────────────────────────
 
 service cloud.firestore {
@@ -74,6 +76,26 @@ service cloud.firestore {
         && isText(request.resource.data.get('email', ''), 200)
         && isText(request.resource.data.get('name', ''), 100);
       allow delete: if isAdmin();
+    }
+
+    // ── Control-room access requests ─────────────────────────
+    match /access_requests/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list, delete: if isAdmin();
+      allow create, update: if isOfficer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'requested_ms'])
+        && isText(request.resource.data.email, 200)
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && request.resource.data.requested_ms is int;
+    }
+
+    // ── Website text (admin → Website content) ───────────────
+    match /site_content/{page} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed'])
+        && request.resource.data.get('fields', {}) is map
+        && request.resource.data.get('posts_managed', false) is bool;
     }
 
     // ── Public fire reports ──────────────────────────────────

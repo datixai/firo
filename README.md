@@ -116,7 +116,7 @@ Wildfires in Pakistan — especially in Azad Jammu & Kashmir — are increasingl
 | 📊 **Analytics View** | Last-hour analytics panel (`/analytics`) with map, alert panel and recent log table |
 | 🌿 **Public Website** | Home, About, Blog, Report a Fire and Contact pages with an animated night-jungle theme |
 | 🧯 **Public Fire Reporting** | Anyone can report smoke/fire with GPS location, map pin and photo |
-| 🛡️ **Admin Panel** | Hidden `/admin` area to manage fire reports, contact messages and blog posts |
+| 🛡️ **Admin Panel** | Hidden `/admin` area for contact messages, blog posts, website text and the control-room team |
 
 ---
 
@@ -181,6 +181,7 @@ FIRO-FYP/
 │   │   ├── firebase-init.js         # Loads /api/config, initialises Firebase
 │   │   ├── common.js                # Shared helpers (escaping, fire status, coords, theme)
 │   │   ├── admin.js                 # Admin panel logic
+│   │   ├── content.js               # Website text edited in the admin panel
 │   │   ├── ops/data.js              # Control room: live data, incidents, workflow actions
 │   │   ├── ops/shell.js             # Control room: top bar, kiosk, sound alerts, pop-out
 │   │   ├── ops/charts.js            # Control room: SVG charts with table views
@@ -351,22 +352,26 @@ The script will:
 ### 4. Admin Setup
 
 The admin panel lives at **`/admin`**. It is not linked from the website and is hidden from search engines.
+Admin rights can only be given in the Firebase Console (the security rules block every other way), so the
+page itself just tells other people to contact the administrator.
 
-1. Create an account at `/login` (or use your existing one) and open `/admin`.
-2. The page shows **"Admin access required"** with your account's **UID**. Click **Copy UID**.
-3. Firebase Console → Firestore Database → **Start collection** → Collection ID `admins` →
-   Document ID = *your UID* → add a field `email` (string) with your email → **Save**.
-4. Click **Check again** on `/admin`. You now have access to:
-   - **Fire reports:** view location, photo and contact, set status (new → reviewing → verified → resolved / dismissed), forward on WhatsApp, delete
+1. Create an account at `/login` (or use your existing one).
+2. Firebase Console → **Authentication → Users**: copy the account's **User UID**.
+3. Firebase Console → Firestore Database → at the top level (not inside `artifacts`) **Start collection** →
+   Collection ID `admins` → Document ID = *the UID* → add a field `email` (string) → **Save**.
+4. Open `/admin`. The profile icon (top right) opens **Website**, **Dashboard** and **Log out**. Tabs:
    - **Messages:** read, reply by email, mark read/unread, delete
-   - **Blog:** write posts in Markdown with live preview, cover images, drafts, publish/unpublish,
-     and **Import starter posts** to make the three built-in articles editable
+   - **Blog:** add, edit, publish/unpublish and delete articles (Markdown with live preview, cover images, drafts).
+     The first time the panel opens, the three built-in articles are copied here so they can be edited or deleted too.
+   - **Website content:** change the text on the Home, About, Blog, Report a Fire and Contact pages and the footer,
+     with a live preview. Only changed text is saved (`site_content` collection); **Reset** restores the original.
+   - **Team:** approve or decline control-room access requests, remove staff, or add someone by user ID
 
-Repeat step 3 for every person who should be an admin.
+Fire reports are handled in the control room (`/incidents`), not in the admin panel.
 
-**Control-room staff.** Operators who handle citizen reports don't need to be admins. Ask them to log in and open
-`/incidents`, which shows their user ID; then add it in **/admin → Team**. Staff can see reporter details and move
-reports through the workflow; any signed-in officer can see camera data.
+**Control-room staff.** Operators who handle citizen reports don't need to be admins. They create an account,
+open the dashboard and press **Request access**; approve them in **/admin → Team**. Staff can see reporter details
+and move reports through the workflow; any signed-in officer can see camera data.
 
 ---
 
@@ -430,7 +435,7 @@ original values for analytics.
 ### Admin (hidden)
 | Page | URL | What it does |
 |---|---|---|
-| Admin panel | `/admin` | Overview, fire reports, contact messages and blog management (see [Admin Setup](#4-admin-setup)) |
+| Admin panel | `/admin` | Contact messages, blog, website text and control-room team (see [Admin Setup](#4-admin-setup)) |
 
 ---
 

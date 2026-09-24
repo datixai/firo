@@ -18,6 +18,7 @@
 
 import { initJungleBackground } from "/js/jungle-bg.js";
 import { esc } from "/js/common.js";
+import { loadSiteContent } from "/js/content.js";
 
 export const NAV_LINKS = [
   { page: "home",    href: "/",        label: "Home" },
@@ -77,11 +78,11 @@ function renderFooter() {
             <img class="brand-mark" src="/assets/logo-mark.png" alt="" width="34" height="39" />
             <span class="brand-name">FIRO</span>
           </a>
-          <p>Edge-AI wildfire detection for the forests of Azad Jammu &amp; Kashmir.
+          <p data-edit="about">Edge-AI wildfire detection for the forests of Azad Jammu &amp; Kashmir.
              Cameras and a Raspberry Pi spot fire on-site and alert the Forest Department in seconds.</p>
         </div>
         <div>
-          <h4>Explore</h4>
+          <h4 data-edit="col1">Explore</h4>
           <ul>
             <li><a href="/">Home</a></li>
             <li><a href="/about">About FIRO</a></li>
@@ -90,7 +91,7 @@ function renderFooter() {
           </ul>
         </div>
         <div>
-          <h4>Act</h4>
+          <h4 data-edit="col2">Act</h4>
           <ul>
             <li><a href="/report">Report a fire</a></li>
             <li><a href="/dashboard">Monitoring dashboard</a></li>
@@ -98,7 +99,7 @@ function renderFooter() {
           </ul>
         </div>
         <div>
-          <h4>Emergency</h4>
+          <h4 data-edit="col3">Emergency</h4>
           <ul>
             <li><span class="text-dim">Rescue:</span> <a href="tel:1122">1122</a></li>
             <li><span class="text-dim">Report online:</span> <a href="/report">/report</a></li>
@@ -107,7 +108,7 @@ function renderFooter() {
       </div>
       <div class="footer-bottom">
         <a class="footer-credit" href="https://datixai.com" target="_blank" rel="noopener">Developed by Datix AI</a>
-        <span>Built for the forests of Azad Kashmir <i class="fa-solid fa-leaf text-leaf" aria-hidden="true"></i></span>
+        <span data-edit="tagline">Built for the forests of Azad Kashmir <i class="fa-solid fa-leaf text-leaf" aria-hidden="true"></i></span>
       </div>
     </div>`;
 }
@@ -160,4 +161,6 @@ export function initSite() {
   renderFooter();
   initJungleBackground();
   initReveal();
+  // Text edited in Admin → Website content (the admin preview waits on this promise)
+  window.__firoContent = loadSiteContent(page).catch((err) => console.warn("[FIRO] Site content:", err));
 }
