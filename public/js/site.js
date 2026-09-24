@@ -110,7 +110,7 @@ function renderFooter() {
       </div>
       <div class="footer-bottom">
         <a class="footer-credit" href="https://datixai.com" target="_blank" rel="noopener">Developed by Datix AI</a>
-        <span data-edit="tagline">Built for the forests of Azad Kashmir <i class="fa-solid fa-leaf text-leaf" aria-hidden="true"></i></span>
+        <span data-edit="tagline">Built for the forests of Azad Kashmir <i class="chinar text-leaf" aria-hidden="true"></i></span>
       </div>
     </div>`;
 }

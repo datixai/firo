@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>Chinar leaf</title>
+  <defs>
+    <mask id="m">
+      <path fill="#fff" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" d="M50.0 67.0 L44.2 74.0 L37.4 69.4 L31.6 70.8 L32.3 69.4 L26.0 70.8 L26.6 69.7 L17.7 68.5 L24.2 62.3 L23.1 61.7 L29.0 59.1 L27.6 58.5 L33.1 56.2 L28.3 54.6 L29.0 53.5 L23.2 48.7 L25.1 48.4 L19.1 43.0 L20.6 42.8 L15.2 32.7 L26.4 34.7 L26.1 33.2 L33.2 37.3 L32.8 35.4 L39.2 39.4 L40.0 38.4 L40.2 36.1 L40.8 27.7 L42.4 29.2 L43.3 20.2 L44.4 21.5 L50.0 10.0 L55.6 21.5 L56.7 20.2 L57.6 29.2 L59.2 27.7 L59.8 36.1 L60.0 38.4 L60.8 39.4 L67.2 35.4 L66.8 37.3 L73.9 33.2 L73.6 34.7 L84.8 32.7 L79.4 42.8 L80.9 43.0 L74.9 48.4 L76.8 48.7 L71.0 53.5 L71.7 54.6 L66.9 56.2 L72.4 58.5 L71.0 59.1 L76.9 61.7 L75.8 62.3 L82.3 68.5 L73.4 69.7 L74.0 70.8 L67.7 69.4 L68.4 70.8 L62.6 69.4 L55.8 74.0Z"/>
+      <path fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" d="M50 64 Q51 76 55 88"/>
+      <g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"><path d="M50 62 L24.8 66.2"/><path d="M50 62 L22.9 38.3"/><path d="M50 62 L50.0 20.6"/><path d="M50 62 L77.1 38.3"/><path d="M50 62 L75.2 66.2"/></g>
+    </mask>
+  </defs>
+  <rect width="100" height="100" fill="#000" mask="url(#m)"/>
+</svg>

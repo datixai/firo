@@ -1073,3 +1073,13 @@ h3 { font-weight: 600; }
   color: var(--jg-text-dim); font-size: .8rem; font-weight: 500;
 }
 .footer-flag img { width: 30px; height: 20px; object-fit: cover; }
+
+/* ── Chinar leaf icon (symbol of Kashmir), takes the text colour ── */
+.chinar {
+  display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -.16em;
+  background-color: currentColor;
+  -webkit-mask: url("/assets/chinar-leaf.svg") center / contain no-repeat;
+          mask: url("/assets/chinar-leaf.svg") center / contain no-repeat;
+}
+.empty .chinar { margin: 0 auto 10px; font-size: 2.4rem; }
+.eyebrow .chinar { width: 1.15em; height: 1.15em; }
