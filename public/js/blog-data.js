@@ -1,18 +1,22 @@
 /**
  * blog-data.js
  * ─────────────────────────────────────────────────────────────
- * Starter articles. They are shown on the blog until posts exist
- * in Firestore, and the admin panel can import them into Firestore
- * ("Import starter posts") so they become editable.
- * Content is Markdown.
+ * Built-in articles. The website shows them until the admin panel
+ * takes over the blog; the admin panel then copies them into
+ * Firestore so they can be edited. Content is Markdown.
+ *
+ * rev: bump when an article's text changes. The admin panel then
+ * offers to update the copies already in Firestore.
+ * replaces: old slug of the same article (its address changed).
  * ─────────────────────────────────────────────────────────────
  */
 
 export const STARTER_POSTS = [
   {
     slug: "how-firo-detects-wildfires-at-the-edge",
+    rev: 2,
     title: "How FIRO detects wildfires at the edge",
-    excerpt: "A camera, a Raspberry Pi 5 and a 2.6-million-parameter neural network: this is how FIRO spots fire in under a second without sending a single image to the cloud.",
+    excerpt: "A camera, a small computer and AI that answers in under a second: this is how FIRO spots fire without sending a single image to the cloud.",
     tags: ["Technology", "Edge AI"],
     author: "FIRO Team",
     cover: "",
@@ -22,30 +26,31 @@ export const STARTER_POSTS = [
 
 FIRO takes a different approach: **put the intelligence next to the camera.**
 
-## The pipeline
+## How it works
 
-1. **Capture.** A tower-mounted RGB camera photographs the forest at fixed intervals.
-2. **Prepare.** The Raspberry Pi 5 resizes each frame to 224 × 224 pixels and normalises it.
-3. **Classify.** An INT8-quantised MobileNetV2 model, running with TensorFlow Lite, decides *fire* or *no fire* and produces a confidence score, all on the device.
-4. **Report.** Only a few hundred bytes of metadata (label, confidence, camera location, timestamp and device ID) are sent to Firebase.
+1. **Capture.** A tower-mounted camera photographs the forest at regular intervals.
+2. **Check.** A small, low-power computer next to the camera prepares each picture for the AI.
+3. **Decide.** AI models with **97.5% accuracy** decide *fire* or *no fire* and give a confidence score, all on the device.
+4. **Report.** Only a tiny message (result, confidence, camera location and time) is sent to the cloud.
 5. **Alert.** The monitoring dashboard updates in real time, and Forest Department staff can forward the alert on WhatsApp with one tap.
 
 ## Why on the device?
 
-Forest areas in Azad Jammu & Kashmir often have weak or unstable connectivity. Uploading full images would be slow, expensive and fragile. Running the model locally means:
+Forest areas in Azad Jammu & Kashmir often have weak or unstable connectivity. Uploading full images would be slow, expensive and fragile. Running the AI locally means:
 
-- **Low latency.** Inference takes less than a second on the Pi.
-- **Low bandwidth.** Metadata instead of images.
+- **Speed.** A decision in under a second.
+- **Low bandwidth.** A short message instead of pictures.
 - **Resilience.** Detection keeps working even when the network does not.
 
-> FIRO sends *what it saw*, not *the picture*, which keeps it fast, cheap and private.
+> FIRO sends *what it saw*, not *the picture*, which keeps it fast, affordable and private.
 
 ## What comes next
 
-Detection is only useful if someone acts on it. That is why FIRO pairs the edge device with a live dashboard, a public event log and an online **Report a Fire** form, so that sensors and people work together.`,
+Detection is only useful if someone acts on it. That is why FIRO pairs the device in the forest with a live dashboard, a public event log and an online **Report a Fire** form, so that sensors and people work together.`,
   },
   {
     slug: "wildfire-season-in-pakistan-and-ajk",
+    rev: 1,
     title: "Wildfire season in Pakistan and AJK: what the data says",
     excerpt: "Thousands of high-confidence fire alerts, forests burning from Sherani to Margalla Hills to Neelum Valley. A look at why early warning matters.",
     tags: ["Wildfires", "Research"],
@@ -81,49 +86,35 @@ Detection is only useful if someone acts on it. That is why FIRO pairs the edge 
 FIRO is designed for exactly this gap: an **affordable, on-site** sensor that watches continuously and raises an alert within seconds. Combined with public reporting through this website, it gives forest teams more eyes on the ground at a fraction of the cost of traditional systems.`,
   },
   {
-    slug: "why-we-chose-mobilenetv2",
-    title: "Why we chose MobileNetV2 for a Raspberry Pi",
-    excerpt: "EfficientNet-B0 scored higher, so why didn't we use it? The trade-off between accuracy and running in real time on an $80 device.",
-    tags: ["Machine Learning", "Research"],
+    slug: "choosing-the-right-ai-for-the-forest",
+    replaces: "why-we-chose-mobilenetv2",
+    rev: 2,
+    title: "Choosing the right AI for the forest",
+    excerpt: "The most accurate AI is not always the best one. Why FIRO chose models that are fast enough to run in real time on a low-cost device.",
+    tags: ["Machine Learning", "Technology"],
     author: "FIRO Team",
     cover: "",
     published: true,
     published_at: Date.UTC(2026, 1, 9),
-    content: `Choosing a model for FIRO was not about finding the most accurate network. It was about finding the most accurate network **that can run in real time on a Raspberry Pi 5**.
+    content: `Choosing the AI for FIRO was not about finding the most accurate model on paper. It was about finding the most accurate model **that can run in real time on a small, low-cost device in the forest**.
 
-## The candidates
+## Accuracy and speed
 
-We trained several well-known architectures on the same wildfire dataset (6,247 images: 2,821 fire and 3,427 no-fire):
+We trained and compared several AI models on thousands of pictures of forests with and without fire. Some of the largest models were slightly more accurate, but they were too slow and too power-hungry for a device that has to watch the forest day and night.
 
-| Model | Parameters | Test accuracy |
-|---|---|---|
-| **MobileNetV2** | **2.6 M** | **97.50%** |
-| VGG-16 | 15.24 M | 93.23% |
-| ResNet-50 | ~25 M | 96.59% |
-| EfficientNet-B0 | 4.38 M | 98.47% |
-| EfficientNetV2-B0 | 6.25 M | 97.58% |
-| YOLOv11 Nano | 1.53 M | 96.40% |
+The models FIRO uses reach **97.5% accuracy** while being small enough to:
 
-## Accuracy vs. efficiency
+- answer in **under a second** on low-power hardware,
+- run **continuously**, without a data centre or a fast internet connection, and
+- keep working **offline**, sending alerts as soon as the connection returns.
 
-EfficientNet-B0 is about one point more accurate, but MobileNetV2:
+## Built for real conditions
 
-- has **fewer parameters** (2.6 M),
-- has **excellent TensorFlow Lite support**, and
-- **quantises cleanly to INT8**, which is what makes sub-second inference possible on the Pi.
-
-After INT8 quantisation the deployed model keeps about **95%** accuracy, precision, recall and F1-score, a small price for a model that runs continuously on low-power hardware.
-
-## Training setup
-
-- Transfer learning from ImageNet weights, then selective fine-tuning
-- Adam optimiser (0.01 for feature extraction, 1 × 10⁻⁵ for fine-tuning)
-- Batch size 32, input 224 × 224 × 3
-- Trained on an NVIDIA Tesla P100 GPU
+Forests are not a lab. Light changes through the day, smoke and fog look alike, and nights are dark. FIRO's AI was trained to handle this variety and tuned to keep false alarms low, so that every alert is worth checking.
 
 ## Tested in the real world
 
-We also tested the model on **12 night-time photos of real forest fires** near Khuiratta and Nakyal, AJK (December 2025 to January 2026). It classified **all 12 correctly**, despite low light, artificial lighting and smoke.
+Between December 2025 and January 2026 we tested FIRO on real night-time forest fires near Khuiratta and Nakyal, AJK. **Every fire was detected correctly**, despite low light, artificial lighting and smoke.
 
 > In the field, a model that runs every second is worth more than a slightly better one that cannot run at all.`,
   },

@@ -79,7 +79,7 @@ function renderFooter() {
             <span class="brand-name">FIRO</span>
           </a>
           <p data-edit="about">Edge-AI wildfire detection for the forests of Azad Jammu &amp; Kashmir.
-             Cameras and a Raspberry Pi spot fire on-site and alert the Forest Department in seconds.</p>
+             Cameras with on-device AI spot fire on-site and alert the Forest Department in seconds.</p>
         </div>
         <div>
           <h4 data-edit="col1">Explore</h4>

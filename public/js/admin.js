@@ -208,7 +208,7 @@ async function takeOverBlog() {
     if (snap.exists() && snap.data().posts_managed) return;
     const missing = posts.length ? [] : STARTER_POSTS;
     const batch = writeBatch(db);
-    missing.forEach((p) => batch.set(doc(db, COLLECTIONS.posts, p.slug), { ...p, updated_ms: Date.now() }));
+    missing.forEach((p) => batch.set(doc(db, COLLECTIONS.posts, p.slug), starterDoc(p)));
     batch.set(ref, { posts_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
     await batch.commit();
     if (missing.length) toast(`The ${missing.length} built-in articles are now listed in Blog, so you can edit or delete them.`, "info", 7000);
@@ -217,7 +217,55 @@ async function takeOverBlog() {
   }
 }
 
+/** A built-in article as stored in Firestore. */
+function starterDoc(sp, keep = {}) {
+  const { rev, replaces, ...post } = sp;
+  return { ...post, ...keep, starter_rev: rev || 1, updated_ms: Date.now() };
+}
+
+/**
+ * Built-in articles whose text changed since they were copied into Firestore
+ * (found by slug, or by their old slug if the address changed).
+ */
+function starterUpdates() {
+  return STARTER_POSTS.map((sp) => ({ sp, cur: posts.find((p) => p.slug === sp.slug) || posts.find((p) => sp.replaces && p.slug === sp.replaces) }))
+    .filter(({ sp, cur }) => cur && (cur.starter_rev || 1) < (sp.rev || 1));
+}
+
+function renderStarterUpdate() {
+  const list = starterUpdates();
+  $("starter-update").hidden = !list.length;
+  $("starter-update-list").textContent = list.length
+    ? ` New wording for: ${list.map(({ sp }) => `"${sp.title}"`).join(", ")}. Updating replaces their text but keeps them published or hidden as they are now.`
+    : "";
+}
+
+$("starter-apply").addEventListener("click", async () => {
+  const list = starterUpdates();
+  if (!list.length || !confirm("Replace these articles with the updated versions? Any changes you made to them will be lost.")) return;
+  try {
+    const batch = writeBatch(db);
+    for (const { sp, cur } of list) {
+      batch.set(doc(db, COLLECTIONS.posts, sp.slug), starterDoc(sp, {
+        published: !!cur.published, published_at: cur.published_at || sp.published_at, cover: cur.cover || sp.cover || "",
+      }));
+      if (cur.slug !== sp.slug) batch.delete(doc(db, COLLECTIONS.posts, cur.slug));
+    }
+    await batch.commit();
+    toast("Articles updated", "success");
+  } catch (err) { console.error(err); toast("Update failed", "error"); }
+});
+
+$("starter-keep").addEventListener("click", async () => {
+  try {
+    const batch = writeBatch(db);
+    for (const { sp, cur } of starterUpdates()) batch.update(doc(db, COLLECTIONS.posts, cur.slug), { starter_rev: sp.rev });
+    await batch.commit();
+  } catch (err) { console.error(err); toast("Update failed", "error"); }
+});
+
 function renderPosts() {
+  renderStarterUpdate();
   $("post-rows").innerHTML = posts.map((p) => `
     <tr>
       <td><strong>${esc(p.title)}</strong><br /><span class="text-muted" style="font-size:.85rem;">/blog/${esc(p.slug)}</span></td>
@@ -332,6 +380,10 @@ $("post-form").addEventListener("submit", async (e) => {
     published_at: new Date($("post-date").value || Date.now()).getTime(),
     updated_ms: Date.now(),
   };
+
+  // Keep the built-in article revision, so "Updated built-in articles" is not offered again
+  const prev = posts.find((x) => x.slug === editing);
+  if (prev?.starter_rev) data.starter_rev = prev.starter_rev;
 
   const fail = (msg) => { status.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
   if (!data.title || !data.excerpt || !data.content.trim()) return fail("Title, summary and content are required.");

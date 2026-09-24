@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>About FIRO — Fire Intelligence &amp; Response Observatory</title>
-  <meta name="description" content="FIRO is a final-year project from the University of Kotli, AJK: a low-cost, edge-AI wildfire detection system for the forests of Azad Jammu & Kashmir." />
+  <meta name="description" content="FIRO is a low-cost, AI-powered wildfire early-warning system for the forests of Azad Jammu & Kashmir." />
   <meta name="theme-color" content="#04160e" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
   <link rel="manifest" href="/manifest.json" />
@@ -35,16 +35,16 @@
             Most of these forests have no active surveillance, and fires are usually reported only once they are visible from settlements.
           </p>
           <p data-edit="s2-text2" class="text-dim">
-            FIRO puts a trained neural network directly on a Raspberry Pi next to a camera. The device recognises fire on its own,
+            FIRO puts AI directly on a small device next to a camera. The device recognises fire on its own,
             sends a tiny alert to the cloud, and gives forest teams the one thing that matters most in a wildfire: <strong>time</strong>.
           </p>
         </div>
         <div class="glass card reveal">
-          <h3 data-edit="s2-heading1"><i class="fa-solid fa-bullseye text-fire" aria-hidden="true"></i> Project objectives</h3>
+          <h3 data-edit="s2-heading1"><i class="fa-solid fa-bullseye text-fire" aria-hidden="true"></i> What FIRO sets out to do</h3>
           <ul class="text-dim" style="padding-left:1.2em;margin:0;display:grid;gap:10px;">
-            <li data-edit="s2-item1">Build a real-time, edge-based detection system that captures images with a Raspberry Pi and classifies them on-device, without cloud processing.</li>
+            <li data-edit="s2-item1">Detect fire in real time on the device itself, right where the camera is, without depending on the cloud.</li>
             <li data-edit="s2-item2">Achieve reliable detection with high accuracy and low latency for round-the-clock monitoring in changing light.</li>
-            <li data-edit="s2-item3">Provide a web dashboard that visualises detections, logs events and supports public fire reporting, sending only compact metadata over the network.</li>
+            <li data-edit="s2-item3">Give response teams a live dashboard and let the public report fires, while sending only small alerts over the network.</li>
           </ul>
         </div>
       </div>
@@ -75,24 +75,24 @@
         </div>
         <div class="grid grid-3">
           <article class="glass card reveal">
-            <div class="icon-badge"><i class="fa-brands fa-raspberry-pi" aria-hidden="true"></i></div>
+            <div class="icon-badge"><i class="fa-solid fa-microchip" aria-hidden="true"></i></div>
             <h3 data-edit="s4-heading1">Edge device</h3>
-            <p data-edit="s4-text1">Raspberry Pi 5 with a USB/CSI camera. Captures, preprocesses (224 × 224 RGB) and classifies images locally.</p>
+            <p data-edit="s4-text1">A small, low-power computer with a camera that watches the forest and checks every picture on the spot.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-brain" aria-hidden="true"></i></div>
-            <h3 data-edit="s4-heading2">MobileNetV2 Lite</h3>
-            <p data-edit="s4-text2">Transfer learning from ImageNet, fine-tuned on 6,247 wildfire images, then INT8-quantised with TensorFlow Lite.</p>
+            <h3 data-edit="s4-heading2">On-device AI</h3>
+            <p data-edit="s4-text2">AI models trained to recognise fire and smoke with 97.5% accuracy, optimised to answer in under a second.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-fire-flame-simple" aria-hidden="true"></i></div>
-            <h3 data-edit="s4-heading3">Firebase cloud</h3>
-            <p data-edit="s4-text3">Firestore stores detection events and reports. Firebase Authentication protects the monitoring tools.</p>
+            <h3 data-edit="s4-heading3">Secure cloud</h3>
+            <p data-edit="s4-text3">Detections and reports are stored securely in the cloud, and only signed-in staff can use the monitoring tools.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-solid fa-map" aria-hidden="true"></i></div>
             <h3 data-edit="s4-heading4">Web dashboard</h3>
-            <p data-edit="s4-text4">Live Leaflet map, alert log, analytics and event history, installable on phones as an app (PWA).</p>
+            <p data-edit="s4-text4">Live map, alert log, analytics and event history. It can be installed on phones like an app.</p>
           </article>
           <article class="glass card reveal">
             <div class="icon-badge"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
@@ -113,28 +113,28 @@
       <div class="container" style="max-width:860px;">
         <div class="section-head reveal">
           <span data-edit="s5-label1" class="eyebrow"><i class="fa-solid fa-route" aria-hidden="true"></i> Our journey</span>
-          <h2 data-edit="s5-title1">From dataset to forest</h2>
+          <h2 data-edit="s5-title1">From research to the forest</h2>
         </div>
         <div class="timeline">
           <div class="glass timeline-item reveal">
-            <h4 data-edit="s5-heading1">Research &amp; dataset</h4>
-            <p data-edit="s5-text1">Reviewed wildfire detection research and prepared a 6,247-image fire / no-fire dataset from Kaggle.</p>
+            <h4 data-edit="s5-heading1">Research</h4>
+            <p data-edit="s5-text1">Studied how wildfires are detected today and where current methods fall short.</p>
           </div>
           <div class="glass timeline-item reveal">
-            <h4 data-edit="s5-heading2">Model training &amp; comparison</h4>
-            <p data-edit="s5-text2">Trained and compared six architectures; MobileNetV2 reached 97.5% test accuracy with only 2.6 M parameters.</p>
+            <h4 data-edit="s5-heading2">Building the AI</h4>
+            <p data-edit="s5-text2">Trained and compared several AI models and chose the one that best balances speed and accuracy: 97.5%.</p>
           </div>
           <div class="glass timeline-item reveal">
             <h4 data-edit="s5-heading3">Edge deployment</h4>
-            <p data-edit="s5-text3">Quantised the model to INT8 TensorFlow Lite and deployed it on a Raspberry Pi 5 with sub-second inference.</p>
+            <p data-edit="s5-text3">Optimised the AI to run on a low-cost device, answering in under a second.</p>
           </div>
           <div class="glass timeline-item reveal">
             <h4 data-edit="s5-heading4">Cloud &amp; dashboard</h4>
-            <p data-edit="s5-text4">Connected the device to Firebase and built the real-time monitoring dashboard with WhatsApp alerts.</p>
+            <p data-edit="s5-text4">Connected the device to the cloud and built the real-time monitoring dashboard with WhatsApp alerts.</p>
           </div>
           <div class="glass timeline-item reveal">
             <h4 data-edit="s5-heading5">Field testing (Dec 2025 to Jan 2026)</h4>
-            <p data-edit="s5-text5">Tested on night-time images of real forest fires near Khuiratta and Nakyal, AJK, with 12 out of 12 detected correctly.</p>
+            <p data-edit="s5-text5">Tested on real night-time forest fires near Khuiratta and Nakyal, AJK. Every fire was detected correctly.</p>
           </div>
         </div>
       </div>
@@ -145,24 +145,24 @@
       <div class="container">
         <div class="section-head reveal">
           <span data-edit="s6-label1" class="eyebrow"><i class="fa-solid fa-users" aria-hidden="true"></i> The team</span>
-          <h2 data-edit="s6-title1">Who built FIRO</h2>
-          <p data-edit="s6-text1">A final-year project of the Department of Data Science, Faculty of Computing &amp; Engineering, University of Kotli, Azad Jammu &amp; Kashmir.</p>
+          <h2 data-edit="s6-title1">The people behind FIRO</h2>
+          <p data-edit="s6-text1">FIRO is developed by Datix AI with a team of data scientists and engineers from Azad Jammu &amp; Kashmir.</p>
         </div>
         <div class="grid grid-3">
           <article class="glass team-card reveal">
             <div data-edit="s6-initials1" class="avatar fire">AA</div>
             <h3 data-edit="s6-heading1">Ahmed Ali</h3>
-            <div data-edit="s6-role1" class="role">Group Leader</div>
+            <div data-edit="s6-role1" class="role">Project Lead</div>
           </article>
           <article class="glass team-card reveal">
             <div data-edit="s6-initials2" class="avatar">SI</div>
             <h3 data-edit="s6-heading2">Seher Ishtiaq</h3>
-            <div data-edit="s6-role2" class="role">Team Member</div>
+            <div data-edit="s6-role2" class="role">Engineer</div>
           </article>
           <article class="glass team-card reveal">
             <div data-edit="s6-initials3" class="avatar">NA</div>
             <h3 data-edit="s6-heading3">Mr. Nabeel Ali</h3>
-            <div data-edit="s6-role3" class="role">Supervisor</div>
+            <div data-edit="s6-role3" class="role">Technical Advisor</div>
           </article>
         </div>
       </div>
