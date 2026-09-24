@@ -166,18 +166,25 @@ FIRO-FYP/
 │   ├── contact.html                 # Contact form                                → /contact
 │   ├── admin.html                   # Hidden admin panel (not linked anywhere)    → /admin
 │   ├── 404.html                     # "Lost in the jungle" page
-│   ├── dashboard.html               # Monitoring dashboard (live map, alerts)     → /dashboard
+│   ├── dashboard.html               # Control room: Overview                      → /dashboard
+│   ├── map.html                     # Control room: full-screen live map          → /map
+│   ├── incidents.html               # Control room: citizen reports desk          → /incidents
+│   ├── cameras.html                 # Control room: camera health                 → /cameras
 │   ├── login.html                   # Firebase Auth login/signup                  → /login
 │   ├── logs.html                    # Historical fire event log                   → /logs
-│   ├── analytics.html               # Last-hour analytics panel                   → /analytics
-│   ├── settings.html                # Dashboard theme preference                  → /settings
+│   ├── analytics.html               # Control room: historical analytics          → /analytics
 │   ├── css/site.css                 # Website design system + jungle theme
+│   ├── css/ops.css                  # Control-room design system (dark, high contrast)
 │   ├── js/
 │   │   ├── site.js                  # Nav bar, footer, toasts, scroll animations
 │   │   ├── jungle-bg.js             # Animated night-jungle background (canvas)
 │   │   ├── firebase-init.js         # Loads /api/config, initialises Firebase
 │   │   ├── common.js                # Shared helpers (escaping, fire status, coords, theme)
 │   │   ├── admin.js                 # Admin panel logic
+│   │   ├── ops/data.js              # Control room: live data, incidents, workflow actions
+│   │   ├── ops/shell.js             # Control room: top bar, kiosk, sound alerts, pop-out
+│   │   ├── ops/charts.js            # Control room: SVG charts with table views
+│   │   ├── ops/map.js               # Control room: Leaflet map layers
 │   │   ├── blog.js / blog-data.js   # Blog loading + built-in starter articles
 │   │   ├── markdown.js              # Safe Markdown rendering for posts
 │   │   └── image-utils.js           # In-browser photo compression
@@ -357,6 +364,10 @@ The admin panel lives at **`/admin`**. It is not linked from the website and is 
 
 Repeat step 3 for every person who should be an admin.
 
+**Control-room staff.** Operators who handle citizen reports don't need to be admins. Ask them to log in and open
+`/incidents`, which shows their user ID; then add it in **/admin → Team**. Staff can see reporter details and move
+reports through the workflow; any signed-in officer can see camera data.
+
 ---
 
 ### 5. Deploying to Vercel
@@ -393,14 +404,28 @@ and paused for visitors who prefer reduced motion.
 | Report a Fire | `/report` | Public form: what they see, GPS / map pin, place, details, photo, contact; optional WhatsApp forward |
 | Contact | `/contact` | Contact form (saved for admins) plus WhatsApp / email / university details |
 
-### Monitoring dashboard (for officers, opened from the **Dashboard** button)
-| Page | URL | What it does |
+### Control room (opened from the profile icon in the nav bar)
+
+A dark, high-contrast operations dashboard built for control rooms with several screens. Every page has its own
+address, so each one can run full-screen on a separate monitor.
+
+| Page | URL | What it shows |
 |---|---|---|
-| Login | `/login` | Firebase email/password login; session ends when the tab closes |
-| Dashboard | `/dashboard` | Live Leaflet map, active fires, alert log with **Send** (WhatsApp) and **Resolved** |
-| Event log | `/logs` | Full history with camera and fire/safe filters (viewable with the link) |
-| Analytics | `/analytics` | Last-hour view: map, alert panel, recent readings |
-| Settings | `/settings` | Light / dark theme for the dashboard pages |
+| Overview | `/dashboard` | Active fires, open reports, cameras online, 24-hour incidents (with change vs previous day), time to acknowledge, live map, unified live incident feed, hourly activity, report status |
+| Live map | `/map` | Full-screen map: cameras (pulse on fire), citizen reports, 30-day incident history, dark/satellite basemaps, open-incident list |
+| Citizen reports | `/incidents` | Live queue from the Report a Fire page with photo, location, reporter; workflow **Acknowledge → Verify → Resolve / Dismiss**; response times; 14-day charts |
+| Cameras | `/cameras` | Health of every camera (online/offline/fire), confidence trend of the last 60 readings, resolve and WhatsApp actions |
+| Analytics | `/analytics` | 24 h / 7 / 30 / 90 days / all time: incidents over time, weekday × hour heat grid, hotspots, report types and outcomes, time-to-close, detection confidence, camera activity; CSV export; every chart has a table view |
+| Event log | `/logs` | Full history of camera readings |
+| Login | `/login` | Stays signed in across windows until **Log out** |
+
+**Control-room features:** red alert banner and tab-title counter for open critical incidents · optional sound alert
+for new fires and reports (speaker icon) · **kiosk mode** hides navigation for wall screens (TV icon, key **K**, or add
+`#kiosk` to the URL) · **pop-out** opens the page in its own window to drag to another screen · fullscreen (key **F**).
+
+Camera readings arrive every few seconds, so consecutive fire readings from one camera (less than 10 minutes apart)
+are grouped into a single **incident**. Resolving an incident marks its readings `status: "resolved"` and keeps the
+original values for analytics.
 
 ### Admin (hidden)
 | Page | URL | What it does |

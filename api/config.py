@@ -21,6 +21,9 @@ Environment Variables, or in .env.local for local development):
   FIREBASE_MESSAGING_SENDER_ID  (optional)
   FIRO_WHATSAPP_NUMBER          (optional, international format without "+")
   FIRO_CONTACT_EMAIL            (optional, shown on the Contact page)
+  FIRO_GOOGLE_MAPS_KEY          (optional, use Google Maps in the control room;
+                                 restrict it to your site's domain in Google Cloud)
+  FIRO_GOOGLE_MAP_ID            (optional, Google Maps map ID; default DEMO_MAP_ID)
 ─────────────────────────────────────────────────────────────
 """
 
@@ -57,6 +60,8 @@ def build_config(env=None):
         "firebase": firebase,
         "whatsappNumber": env.get("FIRO_WHATSAPP_NUMBER", "").strip() or DEFAULT_WHATSAPP_NUMBER,
         "contactEmail": env.get("FIRO_CONTACT_EMAIL", "").strip(),
+        "googleMapsKey": env.get("FIRO_GOOGLE_MAPS_KEY", "").strip(),
+        "googleMapId": env.get("FIRO_GOOGLE_MAP_ID", "").strip(),
     }
     return config, missing
 

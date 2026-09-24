@@ -56,7 +56,7 @@
       ]
     },
     {
-      "source": "/(admin|login|dashboard|analytics|settings)",
+      "source": "/(admin|login|dashboard|map|incidents|cameras|analytics|logs)",
       "headers": [
         {
           "key": "X-Robots-Tag",

@@ -3,5 +3,8 @@ Disallow: /admin
 Disallow: /login
 Disallow: /dashboard
 Disallow: /analytics
-Disallow: /settings
+Disallow: /map
+Disallow: /incidents
+Disallow: /cameras
+Disallow: /logs
 Disallow: /api/

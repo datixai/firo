@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cameras — FIRO Control Room</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0a100e" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/ops.css" />
+  <style>
+    .cam-spark { height: 46px; }
+    .cam-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .cam-card.flash { animation: fresh 2.4s ease-out; }
+    .spark-cap { display: flex; justify-content: space-between; font-size: .72rem; color: var(--ink-3); }
+  </style>
+</head>
+<body class="ops">
+  <header id="topbar"></header>
+
+  <main class="ops-main">
+    <section class="ops-grid" style="margin-bottom:14px;">
+      <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-signal"></i> Online</div><div class="value" id="k-on">–</div><div class="foot">Reading within the last 10 min</div></div>
+      <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-plug-circle-xmark"></i> Offline</div><div class="value" id="k-off">–</div><div class="foot" id="k-off-foot"></div></div>
+      <div class="panel-card kpi span-3" id="kpi-fire"><div class="label"><i class="fa-solid fa-fire"></i> Reporting fire</div><div class="value" id="k-fire">–</div><div class="foot" id="k-fire-foot"></div></div>
+      <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-wave-square"></i> Readings · 24 h</div><div class="value" id="k-read">–</div><div class="foot" id="k-read-foot"></div></div>
+    </section>
+
+    <div class="filter-row">
+      <span class="label">Show</span>
+      <div class="seg" id="state-filter" role="group" aria-label="Filter cameras">
+        <button class="on" data-f="all">All</button><button data-f="fire">Fire</button><button data-f="online">Online</button><button data-f="offline">Offline</button>
+      </div>
+      <input class="input" id="search" type="search" placeholder="Search camera…" aria-label="Search cameras" />
+      <div class="seg" id="view" role="group" aria-label="View" style="margin-left:auto;">
+        <button class="on" data-v="grid"><i class="fa-solid fa-grip"></i> Cards</button><button data-v="table"><i class="fa-solid fa-table"></i> Table</button>
+      </div>
+    </div>
+
+    <div class="cam-grid" id="grid"><div class="empty"><i class="fa-solid fa-satellite-dish"></i>Connecting…</div></div>
+    <div class="panel-card" id="table-wrap" hidden><div class="card-body flush" id="table"></div></div>
+  </main>
+
+  <script type="module">
+    import { esc, registerServiceWorker } from "/js/common.js";
+    import {
+      startOps, watchLogs, cameraSummary, cameraIncidents, resolveCameraIds, whatsappLink, cameraMessage,
+      timeAgo, fmtDateTime, fmtNum, pct,
+    } from "/js/ops/data.js";
+    import { renderShell } from "/js/ops/shell.js";
+    import { sparkline, renderTable } from "/js/ops/charts.js";
+
+    registerServiceWorker();
+    const ctx = await startOps();
+    const shell = renderShell("cameras", ctx);
+    const $ = (id) => document.getElementById(id);
+
+    let logs = [], cams = [], incidents = [], filter = "all", view = "grid", seenInc = null, flashed = false;
+
+    $("state-filter").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-f]"); if (!b) return;
+      filter = b.dataset.f;
+      document.querySelectorAll("#state-filter button").forEach((x) => x.classList.toggle("on", x === b));
+      render();
+    });
+    $("view").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-v]"); if (!b) return;
+      view = b.dataset.v;
+      document.querySelectorAll("#view button").forEach((x) => x.classList.toggle("on", x === b));
+      render();
+    });
+    $("search").addEventListener("input", render);
+
+    $("grid").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      const c = cams.find((x) => x.name === b.dataset.cam); if (!c) return;
+      if (b.dataset.act === "wa") {
+        const inc = incidents.find((i) => i.camera === c.name) || { camera: c.name, lat: c.lat, lon: c.lon, start: c.lastTime };
+        window.open(whatsappLink(ctx.settings.whatsappNumber, cameraMessage(inc)), "_blank");
+      }
+      if (b.dataset.act === "resolve") {
+        if (!confirm(`Mark the fire at ${c.name} as resolved?`)) return;
+        try { await resolveCameraIds(ctx, c.activeIds); shell.toast("Marked as resolved", "success"); }
+        catch (err) { console.error(err); shell.toast("Could not update. Check your permissions.", "error"); }
+      }
+    });
+
+    const stateInfo = (c) => c.active
+      ? { pill: "critical", icon: "fa-fire", label: "Fire detected" }
+      : c.online ? { pill: "good", icon: "fa-circle-check", label: "Online · safe" }
+      : { pill: "offline", icon: "fa-plug-circle-xmark", label: "Offline" };
+
+    function visible() {
+      const q = $("search").value.trim().toLowerCase();
+      return cams.filter((c) => (filter === "all" || (filter === "fire" && c.active) || (filter === "online" && c.online && !c.active) || (filter === "offline" && !c.online))
+        && (!q || c.name.toLowerCase().includes(q)));
+    }
+
+    function render() {
+      const now = Date.now();
+      cams = cameraSummary(logs, now);
+      incidents = cameraIncidents(logs);
+      const list = visible();
+
+      // KPIs
+      const on = cams.filter((c) => c.online).length, off = cams.length - on, fire = cams.filter((c) => c.active);
+      $("k-on").innerHTML = `${on}<small>/ ${cams.length}</small>`;
+      $("k-off").textContent = off;
+      $("k-off-foot").textContent = off ? `Longest: ${cams.filter((c) => !c.online).sort((a, b) => a.lastTime - b.lastTime)[0].name}` : "All cameras reporting";
+      $("k-fire").textContent = fire.length;
+      $("kpi-fire").classList.toggle("alarm", fire.length > 0);
+      $("k-fire-foot").textContent = fire.length ? fire.map((c) => c.name).join(", ") : "No active fires";
+      $("k-read").textContent = fmtNum(cams.reduce((s, c) => s + c.count24h, 0));
+      $("k-read-foot").textContent = `${fmtNum(cams.reduce((s, c) => s + c.fires24h, 0))} fire readings`;
+
+      shell.alertBanner(incidents.filter((i) => i.active).map((i) => ({ ref: i, title: `Fire detected at ${i.camera}`, sub: `Since ${fmtDateTime(i.start)} · peak ${pct(i.peak)}` })),
+        (a) => document.getElementById(`cam-${CSS.escape(a.ref.camera)}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+
+      $("grid").hidden = view !== "grid";
+      $("table-wrap").hidden = view !== "table";
+
+      if (view === "table") {
+        renderTable($("table"), {
+          columns: ["Camera", "State", "Last reading", "Confidence", "Readings 24 h", "Fire readings 24 h", "Total readings", "Coordinates"],
+          rows: list.map((c) => [c.name, stateInfo(c).label, fmtDateTime(c.lastTime), pct(c.lastProb), c.count24h, c.fires24h, c.total,
+            c.lat != null ? `${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}` : "—"]),
+        });
+      } else {
+        $("grid").innerHTML = list.length ? list.map((c) => {
+          const s = stateInfo(c);
+          return `<article class="panel-card cam-card ${c.active ? "fire" : ""}" id="cam-${esc(c.name)}">
+            <div class="cam-head">
+              <span class="cam-name" title="${esc(c.name)}"><i class="fa-solid fa-video" style="color:var(--ink-3);margin-right:7px;"></i>${esc(c.name)}</span>
+              <span class="pill ${s.pill}"><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
+            </div>
+            <div class="cam-stats">
+              <div><b title="${esc(fmtDateTime(c.lastTime))}">${esc(timeAgo(c.lastTime))}</b><span>Last reading</span></div>
+              <div><b class="num">${pct(c.lastProb)}</b><span>Confidence</span></div>
+              <div><b class="num">${c.fires24h}</b><span>Fire (24 h)</span></div>
+            </div>
+            <div>
+              <div class="spark-cap"><span>Fire probability, last ${c.readings.length} readings</span><span>0–100%</span></div>
+              <div class="cam-spark" data-spark="${esc(c.name)}"></div>
+            </div>
+            <div class="cam-foot">
+              <span class="mono muted">${c.lat != null ? `${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}` : "No location"}</span>
+              <span style="display:flex;gap:6px;">
+                <a class="btn btn-sm" href="/map#${encodeURIComponent(c.name)}" title="Show on the live map"><i class="fa-solid fa-map-location-dot"></i></a>
+                <button class="btn btn-sm" data-act="wa" data-cam="${esc(c.name)}" title="Send on WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                ${c.active ? `<button class="btn btn-sm btn-critical" data-act="resolve" data-cam="${esc(c.name)}"><i class="fa-solid fa-check"></i> Resolve</button>` : ""}
+              </span>
+            </div>
+          </article>`;
+        }).join("") : `<div class="empty"><i class="fa-solid fa-video-slash"></i>No cameras match</div>`;
+        for (const c of list) {
+          const el = document.querySelector(`[data-spark="${CSS.escape(c.name)}"]`);
+          if (el) sparkline(el, c.readings.map((r) => r[1]), { max: 1, color: c.active ? "var(--critical)" : "var(--s-camera)" });
+        }
+      }
+
+      // Deep link: /cameras#<name>
+      if (!flashed && location.hash.length > 1 && location.hash !== "#kiosk") {
+        const card = document.getElementById(`cam-${decodeURIComponent(location.hash.slice(1))}`);
+        if (card) { flashed = true; card.scrollIntoView({ block: "center" }); card.classList.add("flash"); }
+      }
+
+      if (seenInc) for (const i of incidents) if (!seenInc.has(i.id) && i.active) shell.notify(`🔥 Camera fire detected: ${i.camera}`);
+      if (logs.length) seenInc = new Set(incidents.map((i) => i.id));
+    }
+
+    let queued = false;
+    const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; render(); }); } };
+    watchLogs(ctx, (d, meta) => { logs = d; shell.setLive(!meta.fromCache); schedule(); },
+      (err) => { console.error(err); shell.setLive(false); shell.toast(`Camera data unavailable: ${err.code || err.message}`, "error"); });
+    setInterval(render, 30000);
+  </script>
+</body>
+</html>

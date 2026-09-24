@@ -31,6 +31,7 @@ export const COLLECTIONS = {
   messages: "contact_messages",  // contact form messages
   posts:    "blog_posts",        // blog articles (doc id = slug)
   admins:   "admins",            // doc id = admin user's UID
+  staff:    "staff",             // doc id = control-room operator's UID
 };
 
 // ─────────────────────────────────────────────────────────────

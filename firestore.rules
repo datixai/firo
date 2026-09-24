@@ -13,6 +13,7 @@ rules_version = '2';
 //   contact_messages  contact form messages    (anyone creates, admins manage)
 //   blog_posts        blog articles, id = slug (public reads published, admins write)
 //   admins            one doc per admin, id = user UID (created by hand in the console)
+//   staff             control-room operators, id = user UID (managed by admins in /admin → Team)
 // ─────────────────────────────────────────────────────────────
 
 service cloud.firestore {
@@ -31,6 +32,11 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Control-room staff (or admins): can see and handle citizen reports
+    function isStaff() {
+      return isAdmin() || (signedIn() && exists(/databases/$(database)/documents/staff/$(request.auth.uid)));
+    }
+
     function isText(v, maxLen) {
       return v is string && v.size() <= maxLen;
     }
@@ -46,10 +52,10 @@ service cloud.firestore {
       // The Pi normally writes with the Admin SDK (service account key),
       // which bypasses these rules. This line covers a client-SDK Pi.
       allow create: if signedIn();
-      // "Resolved" button on the dashboard
+      // "Resolve" button in the control room (keeps the original reading, adds status + time)
       allow update: if isOfficer()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['detection_class', 'fire_probability', 'status']);
+             .hasOnly(['detection_class', 'fire_probability', 'status', 'resolved_ms']);
       allow delete: if isAdmin();
     }
 
@@ -57,6 +63,17 @@ service cloud.firestore {
     match /admins/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
       allow list, write: if false;
+    }
+
+    // ── Control-room staff list ──────────────────────────────
+    match /staff/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['email', 'name', 'added_ms', 'added_by'])
+        && isText(request.resource.data.get('email', ''), 200)
+        && isText(request.resource.data.get('name', ''), 100);
+      allow delete: if isAdmin();
     }
 
     // ── Public fire reports ──────────────────────────────────
@@ -79,7 +96,13 @@ service cloud.firestore {
         && request.resource.data.status == 'new'
         && request.resource.data.created_at == request.time
         && request.resource.data.created_ms is int;
-      allow read, update, delete: if isAdmin();
+      allow read: if isStaff();
+      // Staff move reports through the workflow; admins can edit anything
+      allow update: if isAdmin() || (isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updated_ms', 'acknowledged_ms', 'resolved_ms', 'handled_by'])
+        && request.resource.data.status in ['new', 'reviewing', 'verified', 'resolved', 'dismissed']);
+      allow delete: if isAdmin();
     }
 
     // ── Contact form messages ────────────────────────────────

@@ -20,11 +20,11 @@ import { initJungleBackground } from "/js/jungle-bg.js";
 import { esc } from "/js/common.js";
 
 export const NAV_LINKS = [
-  { page: "home",    href: "/",        label: "Home",    icon: "fa-house" },
-  { page: "about",   href: "/about",   label: "About",   icon: "fa-seedling" },
-  { page: "blog",    href: "/blog",    label: "Blog",    icon: "fa-newspaper" },
-  { page: "report",  href: "/report",  label: "Report a Fire", icon: "fa-fire", cls: "nav-report" },
-  { page: "contact", href: "/contact", label: "Contact", icon: "fa-envelope" },
+  { page: "home",    href: "/",        label: "Home" },
+  { page: "about",   href: "/about",   label: "About" },
+  { page: "blog",    href: "/blog",    label: "Blog" },
+  { page: "report",  href: "/report",  label: "Report a Fire", cls: "nav-report" },
+  { page: "contact", href: "/contact", label: "Contact" },
 ];
 
 function renderHeader(activePage) {
@@ -34,21 +34,18 @@ function renderHeader(activePage) {
   header.innerHTML = `
     <nav class="container nav" aria-label="Main">
       <a class="brand" href="/" aria-label="FIRO home">
-        <img src="/assets/logo.png" alt="" width="42" height="42" />
-        <span>
-          <span class="brand-name">FIRO</span>
-          <span class="brand-tag">Wildfire Early Warning</span>
-        </span>
+        <img class="brand-mark" src="/assets/logo-mark.png" alt="" width="34" height="39" />
+        <span class="brand-name">FIRO</span>
       </a>
       <ul class="nav-links" id="nav-links">
         ${NAV_LINKS.map((l) => `
           <li><a href="${l.href}" class="${l.cls || ""} ${l.page === activePage ? "active" : ""}"
                  ${l.page === activePage ? 'aria-current="page"' : ""}>
-            <i class="fa-solid ${l.icon}" aria-hidden="true"></i>${esc(l.label)}</a></li>`).join("")}
+            ${esc(l.label)}</a></li>`).join("")}
       </ul>
       <div class="nav-actions">
-        <a class="btn btn-leaf btn-sm" href="/dashboard" title="Monitoring dashboard">
-          <i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span class="btn-dashboard-label">Dashboard</span>
+        <a class="nav-profile" href="/dashboard" title="Dashboard" aria-label="Open the monitoring dashboard">
+          <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
         </a>
         <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
           <i class="fa-solid fa-bars" aria-hidden="true"></i>
@@ -77,9 +74,8 @@ function renderFooter() {
       <div class="footer-grid">
         <div class="footer-about">
           <a class="brand" href="/">
-            <img src="/assets/logo.png" alt="" width="42" height="42" />
-            <span><span class="brand-name">FIRO</span>
-            <span class="brand-tag">Fire Intelligence &amp; Response Observatory</span></span>
+            <img class="brand-mark" src="/assets/logo-mark.png" alt="" width="34" height="39" />
+            <span class="brand-name">FIRO</span>
           </a>
           <p>Edge-AI wildfire detection for the forests of Azad Jammu &amp; Kashmir.
              Cameras and a Raspberry Pi spot fire on-site and alert the Forest Department in seconds.</p>
@@ -110,7 +106,7 @@ function renderFooter() {
         </div>
       </div>
       <div class="footer-bottom">
-        <span>© ${new Date().getFullYear()} FIRO · University of Kotli, AJK</span>
+        <a class="footer-credit" href="https://datixai.com" target="_blank" rel="noopener">Developed by Datix AI</a>
         <span>Built for the forests of Azad Kashmir <i class="fa-solid fa-leaf text-leaf" aria-hidden="true"></i></span>
       </div>
     </div>`;

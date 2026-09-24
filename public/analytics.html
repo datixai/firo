@@ -3,234 +3,306 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FIRO — Analytics</title>
+  <title>Analytics — FIRO Control Room</title>
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#1f7a3a" />
+  <meta name="theme-color" content="#0a100e" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!--
-    Analytics panel (replaces the old Python Dash view from app.py).
-    Shows the last hour of readings: map of cameras, alert panel and
-    the most recent log entries. Updates live from Firestore.
-  -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/ops.css" />
   <style>
-    body { background: #111827; color: #ffffff; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; }
-    #fire-map { height: 100%; min-height: 480px; border-radius: 0.75rem; }
-    .leaflet-container { background: #161b22; }
-    .log-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-    .log-table th { background: #30363d; color: #ffffff; font-weight: 700; }
-    .log-table th, .log-table td { border: 1px solid #30363d; text-align: left; padding: 8px; }
-    .log-table td { background: #161b22; color: #e6e6e6; }
-    .log-table tr.fire td { background: rgba(153,27,27,0.4); color: #fca5a5; font-weight: 700; }
+    #content { transition: opacity .2s; }
+    #content.loading { opacity: .5; pointer-events: none; }
+    .chart-card .card-body { display: flex; flex-direction: column; }
   </style>
 </head>
+<body class="ops">
+  <header id="topbar"></header>
 
-<body class="p-6 min-h-screen">
-
-  <!-- Header -->
-  <div class="flex flex-wrap gap-3 justify-between items-center pb-4 border-b border-gray-700 mb-4">
-    <div class="flex items-center gap-3">
-      <a href="/dashboard" class="text-sm px-3 py-1 rounded bg-gray-800 hover:bg-gray-700">← Dashboard</a>
-      <h1 class="text-2xl md:text-3xl font-bold text-cyan-400 tracking-wider">FIRO — Analytics Dashboard (Last Hour)</h1>
-    </div>
-    <div class="flex items-center space-x-4">
-      <span id="connection-status" class="text-sm font-medium px-3 py-1 rounded-full bg-gray-800 text-gray-300">Connecting…</span>
-      <p id="last-updated-time" class="text-sm text-gray-400">N/A</p>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" style="min-height:80vh;">
-    <!-- Map -->
-    <div class="lg:col-span-2 rounded-xl bg-gray-800 shadow-xl overflow-hidden">
-      <div id="fire-map"></div>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="lg:col-span-1 flex flex-col space-y-6">
-      <div id="alert-panel" class="p-6 rounded-xl shadow-xl flex flex-col justify-center items-center flex-shrink-0 bg-gray-800">
-        <div id="alert-icon" style="font-size:4rem;">⏳</div>
-        <h2 id="alert-header" class="text-3xl font-extrabold tracking-tight text-white mb-1 text-center">LOADING</h2>
-        <p id="alert-message" class="text-sm text-gray-400 text-center">Waiting for data…</p>
+  <main class="ops-main">
+    <div class="filter-row">
+      <span class="label">Period</span>
+      <div class="seg" id="range" role="group" aria-label="Time period">
+        <button data-r="1">24 h</button><button class="on" data-r="7">7 days</button><button data-r="30">30 days</button><button data-r="90">90 days</button><button data-r="0">All time</button>
       </div>
+      <button class="btn btn-sm" id="refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+      <span class="muted" id="updated" style="font-size:.82rem;"></span>
+      <button class="btn btn-sm" id="export" style="margin-left:auto;"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+    </div>
 
-      <div class="flex-grow flex flex-col rounded-xl bg-gray-800 shadow-xl p-6">
-        <h3 class="text-xl font-semibold mb-3 text-cyan-400 border-b border-gray-700 pb-2">RECENT LOG HISTORY (Last 60 Mins)</h3>
-        <div id="log-table-container" class="overflow-auto flex-grow">
-          <p class="text-center py-4 text-gray-500 text-sm">No data.</p>
+    <div id="content">
+      <!-- KPIs -->
+      <section class="ops-grid" style="margin-bottom:14px;">
+        <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-video"></i> Camera fire incidents</div><div class="value" id="k-cam">–</div><div class="foot" id="k-cam-foot"></div></div>
+        <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-people-group"></i> Citizen reports</div><div class="value" id="k-rep">–</div><div class="foot" id="k-rep-foot"></div></div>
+        <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-stopwatch"></i> Time to acknowledge</div><div class="value" id="k-ack">–</div><div class="foot" id="k-ack-foot"></div></div>
+        <div class="panel-card kpi span-3"><div class="label"><i class="fa-solid fa-flag-checkered"></i> Time to close</div><div class="value" id="k-res">–</div><div class="foot" id="k-res-foot"></div></div>
+      </section>
+
+      <section class="ops-grid">
+        <div class="panel-card chart-card span-8" id="c-trend">
+          <div class="card-head"><h2>Incidents over time</h2><span class="sub" id="trend-sub"></span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart-legend" id="trend-legend"></div><div class="chart" id="trend" style="height:260px;"></div></div>
         </div>
-      </div>
-    </div>
-  </div>
+        <div class="panel-card chart-card span-4" id="c-types">
+          <div class="card-head"><h2>What people report</h2><span class="sub">Citizen reports by type</span><div class="tools"></div></div>
+          <div class="card-body"><div id="types"></div></div>
+        </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <div class="panel-card chart-card span-6" id="c-heat">
+          <div class="card-head"><h2>When incidents happen</h2><span class="sub">Day of week × hour of day</span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart" id="heat" style="height:230px;"></div><div class="heat-legend" id="heat-legend" style="margin-top:8px;"></div></div>
+        </div>
+        <div class="panel-card chart-card span-6" id="c-hot">
+          <div class="card-head"><h2>Hotspots</h2><span class="sub">Top locations by incidents</span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart-legend" id="hot-legend"></div><div id="hot"></div></div>
+        </div>
+
+        <div class="panel-card chart-card span-4" id="c-outcome">
+          <div class="card-head"><h2>Report outcomes</h2><span class="sub">Status of reports in this period</span><div class="tools"></div></div>
+          <div class="card-body" id="outcome"></div>
+        </div>
+        <div class="panel-card chart-card span-4" id="c-close">
+          <div class="card-head"><h2>Time to close</h2><span class="sub">Citizen reports, report → closed</span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart" id="close" style="height:200px;"></div></div>
+        </div>
+        <div class="panel-card chart-card span-4" id="c-conf">
+          <div class="card-head"><h2>Detection confidence</h2><span class="sub">Peak probability per camera incident</span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart" id="conf" style="height:200px;"></div></div>
+        </div>
+
+        <div class="panel-card chart-card span-12" id="c-cams">
+          <div class="card-head"><h2>Camera activity</h2><span class="sub">Readings and fire readings per camera in this period</span><div class="tools"></div></div>
+          <div class="card-body"><div class="chart-legend" id="cams-legend"></div><div id="cams"></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
 
   <script type="module">
-    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
-    import { esc, isActiveFire, getLatLon, formatTime, registerServiceWorker } from "/js/common.js";
-    import { onAuthStateChanged }
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { collection, query, where, orderBy, limit, onSnapshot }
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { registerServiceWorker } from "/js/common.js";
+    import {
+      startOps, fetchLogsSince, fetchReportsSince, cameraIncidents, median, fmtDuration, fmtDateTime,
+      REPORT_TYPES, REPORT_STATUS, HOUR, DAY, MIN,
+    } from "/js/ops/data.js";
+    import { renderShell, lockedHtml } from "/js/ops/shell.js";
+    import { lineChart, columnChart, barList, heatmap, stackedBar, renderLegend, tableToggle } from "/js/ops/charts.js";
 
     registerServiceWorker();
+    const ctx = await startOps();
+    const shell = renderShell("analytics", ctx);
+    const $ = (id) => document.getElementById(id);
 
-    const WINDOW_MS         = 60 * 60 * 1000;  // last hour
-    const MAX_DOCS          = 50;              // same as the old Dash query
-    const REFRESH_MS        = 5000;            // re-render (window moves forward)
-    const RESUBSCRIBE_MS    = 60 * 1000;       // move the Firestore query window
-    const TABLE_ROWS        = 5;
+    const S_CAM = { key: "camera", name: "Camera incidents", color: "var(--s-camera)" };
+    const S_REP = { key: "report", name: "Citizen reports", color: "var(--s-report)" };
 
-    const statusEl  = document.getElementById("connection-status");
-    const updatedEl = document.getElementById("last-updated-time");
-    const panelEl   = document.getElementById("alert-panel");
-    const iconEl    = document.getElementById("alert-icon");
-    const headerEl  = document.getElementById("alert-header");
-    const messageEl = document.getElementById("alert-message");
-    const tableEl   = document.getElementById("log-table-container");
+    // Charts (+ table twins)
+    const trend = lineChart($("trend"), { title: "Incidents over time", xName: "Period" });
+    const types = barList($("types"), { xName: "Type" });
+    const heat = heatmap($("heat"), { title: "Incidents by weekday and hour", valueName: "Incidents" });
+    const hot = barList($("hot"), { xName: "Location", empty: "No incidents in this period" });
+    const close = columnChart($("close"), { title: "Time to close", xName: "Time to close" });
+    const conf = columnChart($("conf"), { title: "Peak detection confidence", xName: "Confidence" });
+    const camsChart = barList($("cams"), { xName: "Camera" });
+    const toggles = [
+      tableToggle($("c-trend"), $("trend"), () => trend.table()),
+      tableToggle($("c-types"), $("types"), () => types.table()),
+      tableToggle($("c-heat"), $("heat"), () => heat.table()),
+      tableToggle($("c-hot"), $("hot"), () => hot.table()),
+      tableToggle($("c-close"), $("close"), () => close.table()),
+      tableToggle($("c-conf"), $("conf"), () => conf.table()),
+      tableToggle($("c-cams"), $("cams"), () => camsChart.table()),
+    ];
+    renderLegend($("trend-legend"), ctx.isStaff ? [S_CAM, S_REP] : [S_CAM], "line");
+    renderLegend($("hot-legend"), ctx.isStaff ? [S_CAM, S_REP] : [S_CAM], "rect");
+    renderLegend($("cams-legend"), [
+      { name: "Safe readings", color: "var(--s-camera)" }, { name: "Fire readings", color: "var(--critical)" }], "rect");
 
-    const PANEL_BASE = "p-6 rounded-xl shadow-xl flex flex-col justify-center items-center flex-shrink-0 ";
-    const PILL_BASE  = "text-sm font-medium px-3 py-1 rounded-full ";
+    let days = 7, data = null;
 
-    function setStatus(text, cls) {
-      statusEl.textContent = text;
-      statusEl.className = PILL_BASE + cls;
+    function deltaHtml(now, prev, { lowerIsBetter = true, fmt = (v) => v } = {}) {
+      if (prev == null || now == null) return '<span class="delta">no earlier data</span>';
+      const d = now - prev;
+      if (!d) return '<span class="delta">= same</span> vs previous period';
+      const bad = lowerIsBetter ? d > 0 : d < 0;
+      return `<span class="delta ${bad ? "up-bad" : "down-good"}">${d > 0 ? "▲" : "▼"} ${fmt(Math.abs(d))}</span> vs previous period`;
     }
 
-    function setPanel(icon, header, message, fire) {
-      iconEl.textContent    = icon;
-      headerEl.textContent  = header;
-      messageEl.textContent = message;
-      panelEl.className = PANEL_BASE + (fire ? "bg-red-900/50 animate-pulse" : "bg-gray-800");
+    function bucketsFor(start, end) {
+      const span = end - start;
+      const size = span <= 1.1 * DAY ? HOUR : span <= 8 * DAY ? 6 * HOUR : span <= 120 * DAY ? DAY : 7 * DAY;
+      const first = size >= DAY ? new Date(new Date(start).setHours(0, 0, 0, 0)).getTime() : Math.floor(start / size) * size;
+      const out = [];
+      for (let t = first; t < end; t += size) out.push(t);
+      const label = (t) => size < DAY
+        ? new Date(t).toLocaleString([], size === HOUR ? { hour: "2-digit" } : { weekday: "short", hour: "2-digit" })
+        : new Date(t).toLocaleDateString([], { day: "numeric", month: "short" });
+      const tip = (t) => size < DAY
+        ? `${new Date(t).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} – ${new Date(t + size).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+        : size === DAY ? new Date(t).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+        : `Week of ${new Date(t).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })}`;
+      return { size, starts: out, label, tip };
     }
 
-    // ── Firebase ──
-    let firebase;
-    try {
-      firebase = await initFirebase();
-    } catch (err) {
-      console.error(err);
-      setStatus("DB Disconnected", "bg-red-900/50 text-red-300");
-      setPanel("⚠️", "DB NOT CONNECTED", "Could not load configuration from /api/config.", false);
-      throw err;
-    }
-    const { auth, db, config } = firebase;
-
-    // ── Auth guard (same as the main dashboard) ──
-    await new Promise((resolve) => {
-      onAuthStateChanged(auth, (user) => {
-        if (!user || user.isAnonymous) { window.location.replace("/login"); return; }
-        resolve();
-      });
-    });
-
-    // ── Map (dark basemap like the old Dash view) ──
-    const map = L.map("fire-map", { zoomControl: true }).setView([33.73, 73.08], 8);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 19,
-    }).addTo(map);
-    const markerLayer = L.layerGroup().addTo(map);
-    let hasFitted = false;
-
-    // ── Data ──
-    let docs = [];
-    let unsubscribe = null;
-
-    function subscribe() {
-      if (unsubscribe) unsubscribe();
-      const since = Date.now() - WINDOW_MS;
-      const q = query(
-        collection(db, ...fireLogsPath(config)),
-        where("timestamp_ms", ">=", since),
-        orderBy("timestamp_ms", "desc"),
-        limit(MAX_DOCS)
-      );
-      unsubscribe = onSnapshot(q, (snap) => {
-        docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    async function load() {
+      $("content").classList.add("loading");
+      const now = Date.now();
+      const since = days ? now - days * DAY : 0;
+      const fetchSince = days ? now - 2 * days * DAY : 0;   // current + previous period for deltas
+      try {
+        const [logs, reports] = await Promise.all([
+          fetchLogsSince(ctx, fetchSince),
+          ctx.isStaff ? fetchReportsSince(ctx, fetchSince) : Promise.resolve([]),
+        ]);
+        data = { now, since, logs, reports };
         render();
-      }, (err) => {
-        console.error("[FIRO] Firestore listener error:", err);
-        setStatus("DB Disconnected", "bg-red-900/50 text-red-300");
-        setPanel("⚠️", "DB NOT CONNECTED", err.message, false);
-      });
+        $("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        shell.setLive(true);
+      } catch (err) {
+        console.error(err);
+        shell.toast(`Could not load analytics: ${err.code || err.message}`, "error");
+        shell.setLive(false);
+      } finally {
+        $("content").classList.remove("loading");
+      }
     }
 
     function render() {
-      const since  = Date.now() - WINDOW_MS;
-      const recent = docs.filter(d => (d.timestamp_ms || 0) >= since);
+      const { now, since, logs, reports } = data;
+      const allInc = cameraIncidents(logs);
+      const inc = allInc.filter((i) => i.start >= since);
+      const prevInc = days ? allInc.filter((i) => i.start < since) : null;
+      const rep = reports.filter((r) => r.time >= since);
+      const prevRep = days ? reports.filter((r) => r.time < since) : null;
+      const logsNow = logs.filter((l) => l.time >= since);
 
-      // Latest reading per camera (like drop_duplicates in the Dash version)
-      const latestByCamera = new Map();
-      recent.forEach(d => {
-        const name = d.camera_location || "Unknown";
-        if (!latestByCamera.has(name)) latestByCamera.set(name, d);   // docs are newest-first
-      });
-      const cameras = [...latestByCamera.values()];
-
-      markerLayer.clearLayers();
-
-      if (cameras.length === 0) {
-        setStatus("No Data", "bg-yellow-900 text-yellow-300");
-        setPanel("✅", "ALL SYSTEMS GREEN", "No fire threat detected in the last hour.", false);
-        tableEl.innerHTML = `<p class="text-center py-4 text-gray-500 text-sm">No data.</p>`;
-        updatedEl.textContent = "N/A";
-        return;
-      }
-
-      // Map markers: red = fire, lime = safe; size grows with probability
-      const bounds = L.latLngBounds([]);
-      cameras.forEach(d => {
-        const pos = getLatLon(d);
-        if (!pos) return;
-        const fire = isActiveFire(d);
-        const prob = Number(d.fire_probability) || 0;
-        L.circleMarker([pos.lat, pos.lon], {
-          radius: Math.max(6, prob * 15),
-          color: fire ? "red" : "lime", fillColor: fire ? "red" : "lime",
-          fillOpacity: 0.8, weight: 1,
-        }).bindPopup(
-          `<strong>${esc(d.camera_location || "Unknown")}</strong><br/>` +
-          `fire_probability: ${prob.toFixed(2)}<br/>severity: ${esc(d.detection_class || "N/A")}`
-        ).addTo(markerLayer);
-        bounds.extend([pos.lat, pos.lon]);
-      });
-      if (!hasFitted && bounds.isValid()) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 }); hasFitted = true; }
-
-      // Alert panel: highest-probability camera currently reporting fire
-      const fires = cameras.filter(isActiveFire)
-        .sort((a, b) => (Number(b.fire_probability) || 0) - (Number(a.fire_probability) || 0));
-      if (fires.length) {
-        const top  = fires[0];
-        const prob = ((Number(top.fire_probability) || 0) * 100).toFixed(1) + "%";
-        setPanel("🔥", "⚠️  FIRE DETECTED", `${top.camera_location || "Unknown"} — ${prob} probability`, true);
+      // KPIs
+      $("k-cam").textContent = inc.length;
+      $("k-cam-foot").innerHTML = deltaHtml(inc.length, prevInc?.length);
+      const ackOf = (list) => median(list.filter((r) => r.ackMs).map((r) => r.ackMs - r.time));
+      const resOf = (list) => median(list.filter((r) => r.resolvedMs).map((r) => r.resolvedMs - r.time));
+      if (ctx.isStaff) {
+        $("k-rep").textContent = rep.length;
+        $("k-rep-foot").innerHTML = deltaHtml(rep.length, prevRep?.length);
+        $("k-ack").textContent = fmtDuration(ackOf(rep));
+        $("k-ack-foot").innerHTML = deltaHtml(ackOf(rep), prevRep ? ackOf(prevRep) : null, { fmt: fmtDuration });
+        $("k-res").textContent = fmtDuration(resOf(rep));
+        $("k-res-foot").innerHTML = deltaHtml(resOf(rep), prevRep ? resOf(prevRep) : null, { fmt: fmtDuration });
       } else {
-        setPanel("✅", "ALL SYSTEMS GREEN", "No fire threat detected in the last hour.", false);
+        for (const k of ["rep", "ack", "res"]) { $(`k-${k}`).textContent = "—"; $(`k-${k}-foot`).innerHTML = '<i class="fa-solid fa-lock"></i> Staff only'; }
       }
 
-      // Recent log table
-      const rows = cameras.slice(0, TABLE_ROWS).map(d => {
-        const prob = ((Number(d.fire_probability) || 0) * 100).toFixed(2) + "%";
-        return `<tr class="${isActiveFire(d) ? "fire" : ""}">
-                  <td>${esc(formatTime(d))}</td>
-                  <td>${esc(d.camera_location || "Unknown")}</td>
-                  <td>${prob}</td>
-                </tr>`;
-      }).join("");
-      tableEl.innerHTML = `<table class="log-table">
-          <thead><tr><th>Time</th><th>Location</th><th>Prob.</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
+      // Trend
+      const start = since || Math.min(now - DAY, ...inc.map((i) => i.start), ...rep.map((r) => r.time));
+      const b = bucketsFor(start, now);
+      $("trend-sub").textContent = `Per ${b.size === HOUR ? "hour" : b.size === 6 * HOUR ? "6 hours" : b.size === DAY ? "day" : "week"}`;
+      const idx = (t) => Math.min(b.starts.length - 1, Math.max(0, Math.floor((t - b.starts[0]) / b.size)));
+      const camCounts = new Array(b.starts.length).fill(0), repCounts = new Array(b.starts.length).fill(0);
+      inc.forEach((i) => camCounts[idx(i.start)]++);
+      rep.forEach((r) => repCounts[idx(r.time)]++);
+      trend.update({
+        series: ctx.isStaff ? [S_CAM, S_REP] : [S_CAM],
+        points: b.starts.map((t, i) => ({ t, label: b.label(t), tipLabel: b.tip(t), values: { camera: camCounts[i], report: repCounts[i] } })),
+      });
 
-      setStatus("Connected", "bg-green-900 text-green-300");
-      updatedEl.textContent = new Date().toLocaleTimeString();
+      // Types
+      if (ctx.isStaff) {
+        types.update({
+          series: [{ key: "n", name: "Reports", color: "var(--s-report)" }],
+          rows: Object.entries(REPORT_TYPES).map(([k, t]) => ({ label: t.label, values: { n: rep.filter((r) => r.type === k).length } }))
+            .sort((a, b) => b.values.n - a.values.n),
+        });
+      } else $("types").innerHTML = lockedHtml(ctx);
+
+      // Heatmap (Mon..Sun × 0..23)
+      const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const grid = DAYS.map(() => new Array(24).fill(0));
+      const addHeat = (t) => { const d = new Date(t); grid[(d.getDay() + 6) % 7][d.getHours()]++; };
+      inc.forEach((i) => addHeat(i.start)); rep.forEach((r) => addHeat(r.time));
+      heat.update({ rows: DAYS, cols: Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")), values: grid });
+      heat.legend($("heat-legend"));
+
+      // Hotspots (camera names + report places)
+      const norm = (s) => s.trim().replace(/\s+/g, " ");
+      const spots = new Map();
+      const bump = (place, key) => {
+        const k = norm(place).toLowerCase();
+        if (!spots.has(k)) spots.set(k, { label: norm(place), values: { camera: 0, report: 0 } });
+        spots.get(k).values[key]++;
+      };
+      inc.forEach((i) => bump(i.camera, "camera")); rep.forEach((r) => bump(r.place, "report"));
+      hot.update({
+        series: ctx.isStaff ? [S_CAM, S_REP] : [S_CAM],
+        rows: [...spots.values()].sort((a, b) => (b.values.camera + b.values.report) - (a.values.camera + a.values.report)).slice(0, 8),
+      });
+
+      // Outcomes
+      if (ctx.isStaff) {
+        stackedBar($("outcome"), Object.entries(REPORT_STATUS).map(([k, s]) => ({
+          label: s.label, icon: s.icon, value: rep.filter((r) => r.status === k).length,
+          color: `var(--${{ new: "critical", reviewing: "warning", verified: "serious", resolved: "good", dismissed: "offline" }[k]})`,
+        })));
+      } else $("outcome").innerHTML = lockedHtml(ctx);
+
+      // Time to close histogram
+      const BINS = [[0, 15 * MIN, "< 15 min"], [15 * MIN, 30 * MIN, "15–30 min"], [30 * MIN, HOUR, "30–60 min"],
+        [HOUR, 2 * HOUR, "1–2 h"], [2 * HOUR, 6 * HOUR, "2–6 h"], [6 * HOUR, DAY, "6–24 h"], [DAY, Infinity, "> 1 day"]];
+      if (ctx.isStaff) {
+        const durations = rep.filter((r) => r.resolvedMs).map((r) => r.resolvedMs - r.time);
+        close.update({
+          series: [{ key: "n", name: "Reports", color: "var(--s-report)" }],
+          buckets: BINS.map(([a, z, l]) => ({ label: l.replace(" min", "m").replace(" h", "h"), tipLabel: l, values: { n: durations.filter((d) => d >= a && d < z).length } })),
+        });
+      } else $("close").innerHTML = lockedHtml(ctx);
+
+      // Confidence histogram
+      const CB = [[0, .5, "< 50%"], [.5, .6, "50–60%"], [.6, .7, "60–70%"], [.7, .8, "70–80%"], [.8, .9, "80–90%"], [.9, 1.01, "90–100%"]];
+      conf.update({
+        series: [{ key: "n", name: "Camera incidents", color: "var(--s-camera)" }],
+        buckets: CB.map(([a, z, l]) => ({ label: l, tipLabel: `Peak confidence ${l}`, values: { n: inc.filter((i) => i.peak >= a && i.peak < z).length } })),
+      });
+
+      // Camera activity
+      const perCam = new Map();
+      logsNow.forEach((l) => {
+        if (!perCam.has(l.camera)) perCam.set(l.camera, { label: l.camera, values: { safe: 0, fire: 0 } });
+        perCam.get(l.camera).values[l.fire ? "fire" : "safe"]++;
+      });
+      camsChart.update({
+        series: [{ key: "safe", name: "Safe readings", color: "var(--s-camera)" }, { key: "fire", name: "Fire readings", color: "var(--critical)" }],
+        rows: [...perCam.values()].sort((a, b) => (b.values.safe + b.values.fire) - (a.values.safe + a.values.fire)),
+      });
+
+      toggles.forEach((t) => t.refresh());
+      data.current = { inc, rep };
     }
 
-    subscribe();
-    setInterval(render, REFRESH_MS);
-    setInterval(subscribe, RESUBSCRIBE_MS);
+    // CSV export of incidents in the selected period
+    $("export").addEventListener("click", () => {
+      if (!data?.current) return;
+      const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const rows = [["source", "reference", "place_or_camera", "type", "status", "started", "lat", "lon", "peak_confidence", "acknowledged_after_min", "closed_after_min"]];
+      data.current.inc.forEach((i) => rows.push(["camera", i.id, i.camera, "fire detection", i.active ? "active" : "resolved",
+        fmtDateTime(i.start), i.lat ?? "", i.lon ?? "", i.peak.toFixed(3), "", i.resolvedMs ? Math.round((i.resolvedMs - i.start) / MIN) : ""]));
+      data.current.rep.forEach((r) => rows.push(["citizen report", r.ref, r.place, r.typeInfo.label, r.statusInfo.label,
+        fmtDateTime(r.time), r.lat ?? "", r.lon ?? "", "", r.ackMs ? Math.round((r.ackMs - r.time) / MIN) : "", r.resolvedMs ? Math.round((r.resolvedMs - r.time) / MIN) : ""]));
+      const blob = new Blob([rows.map((r) => r.map(q).join(",")).join("\n")], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `firo-incidents-${days ? `${days}d` : "all"}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    $("range").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-r]"); if (!b) return;
+      days = Number(b.dataset.r);
+      document.querySelectorAll("#range button").forEach((x) => x.classList.toggle("on", x === b));
+      load();
+    });
+    $("refresh").addEventListener("click", load);
+    load();
+    setInterval(load, 5 * 60 * 1000);   // refresh every 5 minutes
   </script>
 </body>
 </html>

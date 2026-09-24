@@ -218,7 +218,12 @@ $("report-list").addEventListener("change", async (e) => {
   const id = e.target.dataset.status;
   if (!id) return;
   try {
-    await updateDoc(doc(db, COLLECTIONS.reports, id), { status: e.target.value, updated_ms: Date.now() });
+    const r = reports.find((x) => x.id === id) || {};
+    const status = e.target.value, now = Date.now();
+    const data = { status, updated_ms: now, handled_by: user.email || user.uid };
+    if (status !== "new" && !r.acknowledged_ms) data.acknowledged_ms = now;
+    if (status === "resolved" || status === "dismissed") data.resolved_ms = now;
+    await updateDoc(doc(db, COLLECTIONS.reports, id), data);
     toast("Status updated", "success");
   } catch (err) { console.error(err); toast("Update failed", "error"); }
 });
@@ -445,4 +450,36 @@ $("post-form").addEventListener("submit", async (e) => {
   } finally {
     $("save-post").disabled = false;
   }
+});
+
+/* ── Team (control-room staff) ─────────────────────────────── */
+let staff = [];
+onSnapshot(collection(db, COLLECTIONS.staff), (snap) => {
+  staff = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => (b.added_ms || 0) - (a.added_ms || 0));
+  $("staff-rows").innerHTML = staff.map((m) => `
+    <tr>
+      <td><strong>${esc(m.email || m.name || "—")}</strong></td>
+      <td class="text-muted" style="font-family:ui-monospace,Consolas,monospace;font-size:.85rem;">${esc(m.uid)}</td>
+      <td class="text-dim">${esc(formatDate(m.added_ms))}</td>
+      <td style="text-align:right;"><button class="btn btn-sm btn-danger" data-remove-staff="${esc(m.uid)}"><i class="fa-solid fa-user-minus"></i> Remove</button></td>
+    </tr>`).join("") || `<tr><td colspan="4" class="empty">No staff yet. Admins already have full access.</td></tr>`;
+}, listenerError("team"));
+
+$("staff-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const uid = $("staff-uid").value.trim();
+  const label = $("staff-email").value.trim();
+  if (!/^[A-Za-z0-9_-]{6,128}$/.test(uid)) return toast("That doesn't look like a user ID. Copy it from the /incidents page.", "error");
+  try {
+    await setDoc(doc(db, COLLECTIONS.staff, uid), { email: label, added_ms: Date.now(), added_by: user.email || user.uid });
+    $("staff-form").reset();
+    toast("Added to the control-room team", "success");
+  } catch (err) { console.error(err); toast("Could not add staff. Check the security rules are published.", "error"); }
+});
+
+$("staff-rows").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-remove-staff]");
+  if (!b || !confirm("Remove this person from the control-room team?")) return;
+  try { await deleteDoc(doc(db, COLLECTIONS.staff, b.dataset.removeStaff)); toast("Removed from the team", "success"); }
+  catch (err) { console.error(err); toast("Could not remove staff.", "error"); }
 });

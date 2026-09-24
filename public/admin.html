@@ -12,6 +12,7 @@
   <style>
     .admin-bar { position: sticky; top: 0; z-index: 50; background: rgba(2, 13, 8, .88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--jg-border); }
     .admin-bar .nav { min-height: 64px; }
+    .admin-badge { padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #ffc48f; background: rgba(244, 122, 31, .14); border: 1px solid rgba(244, 122, 31, .35); }
     .admin-user { font-size: .85rem; color: var(--jg-text-dim); text-align: right; line-height: 1.3; }
     .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 26px 0 22px; }
     .tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--jg-border); background: rgba(2, 13, 8, .5); color: var(--jg-text-dim); font: 600 .92rem var(--font-body); cursor: pointer; }
@@ -48,8 +49,9 @@
   <header class="admin-bar">
     <nav class="container nav">
       <a class="brand" href="/admin">
-        <img src="/assets/logo.png" alt="" width="42" height="42" />
-        <span><span class="brand-name">FIRO</span><span class="brand-tag">Admin panel</span></span>
+        <img class="brand-mark" src="/assets/logo-mark.png" alt="" width="34" height="39" />
+        <span class="brand-name">FIRO</span>
+        <span class="admin-badge">Admin</span>
       </a>
       <div class="nav-actions">
         <div class="admin-user" id="admin-user"></div>
@@ -87,6 +89,7 @@
         <button class="tab" data-tab="reports" role="tab"><i class="fa-solid fa-fire" aria-hidden="true"></i> Fire reports <span class="count" id="count-reports" hidden></span></button>
         <button class="tab" data-tab="messages" role="tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Messages <span class="count" id="count-messages" hidden></span></button>
         <button class="tab" data-tab="blog" role="tab"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</button>
+        <button class="tab" data-tab="team" role="tab"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> Team</button>
       </div>
 
       <!-- Overview -->
@@ -110,7 +113,10 @@
         <div class="glass card" style="margin-top:22px;">
           <h3>Quick links</h3>
           <div class="item-actions">
-            <a class="btn btn-sm" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Dashboard</a>
+            <a class="btn btn-sm" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Control room</a>
+            <a class="btn btn-sm" href="/map"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Live map</a>
+            <a class="btn btn-sm" href="/incidents"><i class="fa-solid fa-people-group" aria-hidden="true"></i> Citizen reports desk</a>
+            <a class="btn btn-sm" href="/cameras"><i class="fa-solid fa-video" aria-hidden="true"></i> Cameras</a>
             <a class="btn btn-sm" href="/analytics"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Analytics</a>
             <a class="btn btn-sm" href="/logs"><i class="fa-solid fa-list" aria-hidden="true"></i> Event logs</a>
             <a class="btn btn-sm" href="https://console.firebase.google.com/" target="_blank" rel="noopener"><i class="fa-solid fa-fire-flame-simple" aria-hidden="true"></i> Firebase console</a>
@@ -167,6 +173,38 @@
             <tbody id="post-rows"></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- Team -->
+      <section data-panel="team" hidden>
+        <div class="panel-head"><h2>Control-room team</h2></div>
+        <p class="text-dim" style="max-width:760px;">
+          Staff can open the control room's <strong>Citizen reports</strong> desk, see reporter details and move reports
+          through the workflow (acknowledge, verify, resolve). Any signed-in officer can see camera data.
+          Ask the person to log in and open <code>/incidents</code>; it shows their user ID to paste here.
+        </p>
+        <div class="glass card" style="margin:16px 0;">
+          <form class="form" id="staff-form">
+            <div class="form-row">
+              <div class="field">
+                <label for="staff-uid">User ID (UID) <span class="req">*</span></label>
+                <input class="input" id="staff-uid" required maxlength="128" placeholder="e.g. 3fQk2…" />
+              </div>
+              <div class="field">
+                <label for="staff-email">Email or name (for your reference)</label>
+                <input class="input" id="staff-email" maxlength="200" placeholder="operator@example.com" />
+              </div>
+            </div>
+            <div class="item-actions"><button class="btn btn-leaf btn-sm" type="submit"><i class="fa-solid fa-user-plus"></i> Add to staff</button></div>
+          </form>
+        </div>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Staff member</th><th>User ID</th><th>Added</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="staff-rows"></tbody>
+          </table>
+        </div>
+        <p class="text-muted" style="font-size:.88rem;margin-top:14px;">Admins are managed in Firebase Console → Firestore → <code>admins</code> (document ID = user ID). Admins are always staff too.</p>
       </section>
     </div>
   </main>

@@ -183,6 +183,7 @@ logs/
 
 # Raw datasets (never commit large datasets)
 data/
+!public/data/
 datasets/
 *.csv
 *.parquet

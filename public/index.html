@@ -23,7 +23,6 @@
     <section class="hero">
       <div class="container">
         <div class="hero-inner reveal">
-          <span class="eyebrow"><i class="fa-solid fa-microchip" aria-hidden="true"></i> Edge AI · Real-time · AJK</span>
           <h1>Spot wildfires <span class="glow">before they spread.</span></h1>
           <p class="lead">
             FIRO watches the forests of Azad Jammu &amp; Kashmir with cameras and on-device AI.
@@ -33,25 +32,6 @@
             <a class="btn btn-fire btn-lg" href="/report"><i class="fa-solid fa-fire" aria-hidden="true"></i> Report a fire</a>
             <a class="btn btn-lg" href="/dashboard"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Live dashboard</a>
             <a class="btn btn-lg" href="#how-it-works"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> How it works</a>
-          </div>
-        </div>
-
-        <div class="stats">
-          <div class="glass stat reveal">
-            <div class="stat-value leaf">97.5%</div>
-            <div class="stat-label">Test accuracy (MobileNetV2)</div>
-          </div>
-          <div class="glass stat reveal">
-            <div class="stat-value">&lt; 1 s</div>
-            <div class="stat-label">Inference on a Raspberry Pi 5</div>
-          </div>
-          <div class="glass stat reveal">
-            <div class="stat-value leaf">~$80</div>
-            <div class="stat-label">Edge device per location</div>
-          </div>
-          <div class="glass stat reveal">
-            <div class="stat-value fire">2,214</div>
-            <div class="stat-label">High-confidence fire alerts in Pakistan (Apr 2024 to Apr 2025)</div>
           </div>
         </div>
       </div>
@@ -158,36 +138,6 @@
             <p>Correctly classified all 12 night-time images of real forest fires near Khuiratta and Nakyal, AJK.</p>
           </article>
         </div>
-      </div>
-    </section>
-
-    <!-- Model results -->
-    <section class="section">
-      <div class="container">
-        <div class="section-head reveal">
-          <span class="eyebrow"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> Research</span>
-          <h2>Accurate enough, fast enough</h2>
-          <p>We compared six architectures on the same wildfire dataset of 6,247 images and picked the best fit for real-time edge use.</p>
-        </div>
-        <div class="glass table-wrap reveal">
-          <table class="table">
-            <thead>
-              <tr><th>Model</th><th>Parameters</th><th>Test accuracy</th></tr>
-            </thead>
-            <tbody>
-              <tr class="highlight"><td>MobileNetV2 (FIRO)</td><td>2.6 M</td><td>97.50%</td></tr>
-              <tr><td>EfficientNet-B0</td><td>4.38 M</td><td>98.47%</td></tr>
-              <tr><td>EfficientNetV2-B0</td><td>6.25 M</td><td>97.58%</td></tr>
-              <tr><td>ResNet-50</td><td>~25 M</td><td>96.59%</td></tr>
-              <tr><td>YOLOv11 Nano</td><td>1.53 M</td><td>96.40%</td></tr>
-              <tr><td>VGG-16</td><td>15.24 M</td><td>93.23%</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="center text-muted reveal" style="margin-top:16px;">
-          The deployed INT8 TensorFlow Lite version keeps ~95% accuracy while running in under a second on a Raspberry Pi 5.
-          <a href="/blog/why-we-chose-mobilenetv2">Read why we chose it →</a>
-        </p>
       </div>
     </section>
 

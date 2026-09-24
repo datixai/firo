@@ -1,509 +1,363 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard — Fire Monitoring Department</title>
+  <title>Overview — FIRO Control Room</title>
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#1f7a3a" />
+  <meta name="theme-color" content="#0a100e" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
-
-  <style>
-    :root {
-      --logo-green: #2B8E4E;
-      --logo-orange: #F47A1F;
-      --bg-light: #f3f4f6;
-      --bg-dark: #061226;
-      --card-light: #ffffff;
-      --card-dark: #0B1B2B;
-      --card-dark-2: #102432;
-      --text-light: #0f172a;
-      --text-dark: #ffffff;
-      --border-light: #e6e9ee;
-      --border-dark: rgba(255, 255, 255, 0.06);
-      --btn-light-bg: #f3f4f6;
-      --btn-light-border: #d1d5db;
-      --btn-dark-bg: #15232e;
-      --btn-dark-border: rgba(255, 255, 255, 0.06);
-    }
-
-    html, body { height: 100%; width: 100%; margin: 0;
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-
-    body { background: var(--bg-light); color: var(--text-light); transition: background .22s, color .22s; }
-    body[data-theme="dark"] { background: var(--bg-dark); color: var(--text-dark); }
-
-    .card { background: var(--card-light); border: 1px solid var(--border-light);
-      border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all .22s; }
-    [data-theme="dark"] .card { background: var(--card-dark); border: 1px solid var(--border-dark);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.2); }
-
-    .alert-card-safe { background: #ECFDF3; border: 1px solid #C6F6D5; color: #064E3B; }
-    .alert-card-fire { background: #FFF5F5; border: 1px solid #FED7D7; color: #7F1D1D; }
-    [data-theme="dark"] .alert-card-safe { background: var(--card-dark-2); border: 1px solid rgba(43,142,78,0.14); color: var(--text-dark); }
-    [data-theme="dark"] .alert-card-fire { background: #3a2326; border: 1px solid rgba(244,122,31,0.12); color: var(--text-dark); }
-
-    [data-theme="dark"] .text-gray-500,
-    [data-theme="dark"] .text-gray-400 { color: rgba(249,247,247,0.75) !important; }
-    [data-theme="dark"] h1, [data-theme="dark"] h2,
-    [data-theme="dark"] .card, [data-theme="dark"] p { color: var(--text-dark) !important; }
-
-    header.main-header { position: sticky; top: 12px; z-index: 40;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 20px; padding: 18px 26px; margin: 0 auto 18px; max-width: 1800px; }
-
-    header h1 { font-weight: 700; font-size: 24px; margin: 0; color: var(--logo-green); }
-    [data-theme="dark"] header h1 { color: var(--logo-green); }
-
-    #map { height: 520px; border-radius: 10px; width: 100%; }
-
-    .legend-dot { width: 12px; height: 12px; border-radius: 50%;
-      display: inline-block; margin-right: 8px; }
-
-    .blink { animation: blink 1s infinite; }
-    @keyframes blink { 50% { opacity: .35; transform: scale(1.25); } }
-
-    .marker-dot { width: 18px; height: 18px; border-radius: 50%;
-      border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
-
-    .menu-panel { position: absolute; right: 12px; top: 64px; min-width: 220px;
-      border-radius: 10px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.12); }
-    .menu-panel a { display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; color: inherit; text-decoration: none; }
-    .menu-panel a:hover { background: rgba(0,0,0,0.03); }
-    .menu-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-      border-bottom: 1px solid rgba(0,0,0,0.04); font-weight: 700; }
-    [data-theme="dark"] .menu-header { border-bottom-color: rgba(255,255,255,0.03); }
-
-    .settings-sidebar { position: fixed; right: -360px; top: 0; height: 100%; width: 360px;
-      padding: 20px; z-index: 200; transition: right .34s cubic-bezier(.2,.9,.2,1);
-      box-shadow: -18px 0 40px rgba(2,6,23,0.35); }
-    .settings-sidebar.active { right: 0; }
-    [data-theme="dark"] .settings-sidebar { background: var(--card-dark); border-left: 1px solid var(--border-dark); }
-
-    .btn { border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer;
-      border: 1px solid var(--btn-light-border); background: var(--btn-light-bg);
-      color: var(--text-light); transition: all .18s; }
-    .btn.small { padding: 4px 8px; font-size: 0.8rem; }
-    .btn-send    { background: #E6F0FF; border-color: #c7ddff; color: #0b3a6b; }
-    .btn-resolve { background: #FFE9E9; border-color: #f5c7c7; color: #6b1b1b; }
-    .btn-clear   { background: #f3f4f6; border-color: #d1d5db; color: #111827; }
-    [data-theme="dark"] .btn         { background: var(--btn-dark-bg); border-color: var(--btn-dark-border); color: var(--text-dark); }
-    [data-theme="dark"] .btn-send    { background: rgba(26,67,111,0.18); border-color: rgba(60,120,200,0.15); color: #dbeeff; }
-    [data-theme="dark"] .btn-resolve { background: rgba(111,41,41,0.16); border-color: rgba(244,122,31,0.08); color: #ffdede; }
-    [data-theme="dark"] .btn-clear   { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #e6eef6; }
-
-    #alert-list { max-height: 520px; overflow: auto; padding-right: 6px; }
-
-    .page-container { max-width: 1800px; margin: 0 auto; padding: 20px; width: 100%; }
-    .header-wrapper { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-    .header-left  { justify-self: start; }
-    .header-center{ justify-self: center; }
-    .header-right { justify-self: end; }
-
-    @media (max-width: 1024px) {
-      #map { height: 420px; }
-      .settings-sidebar { width: 100%; right: -100%; }
-    }
-  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/ops.css" />
 </head>
+<body class="ops fill">
+  <header id="topbar"></header>
 
-<body data-theme="">
+  <main class="ops-main">
+    <!-- KPI row -->
+    <section class="ops-grid" style="margin-bottom:14px;" aria-label="Key figures">
+      <div class="panel-card kpi span-2" id="kpi-fires">
+        <div class="label"><i class="fa-solid fa-fire"></i> Active fires</div>
+        <div class="value" id="k-fires">–</div>
+        <div class="foot" id="k-fires-foot">Cameras reporting fire now</div>
+      </div>
+      <div class="panel-card kpi span-2">
+        <div class="label"><i class="fa-solid fa-people-group"></i> Open citizen reports</div>
+        <div class="value" id="k-open">–</div>
+        <div class="foot" id="k-open-foot"></div>
+      </div>
+      <div class="panel-card kpi span-2">
+        <div class="label"><i class="fa-solid fa-video"></i> Cameras online</div>
+        <div class="value" id="k-online">–</div>
+        <div class="foot" id="k-online-foot"></div>
+      </div>
+      <div class="panel-card kpi span-2">
+        <div class="label"><i class="fa-solid fa-bolt"></i> Incidents · 24 h</div>
+        <div class="value" id="k-24h">–</div>
+        <div class="foot" id="k-24h-foot"></div>
+        <div class="spark" id="k-24h-spark"></div>
+      </div>
+      <div class="panel-card kpi span-2">
+        <div class="label"><i class="fa-solid fa-stopwatch"></i> Time to acknowledge</div>
+        <div class="value" id="k-ack">–</div>
+        <div class="foot" id="k-ack-foot">Median, last 7 days</div>
+      </div>
+      <div class="panel-card kpi span-2">
+        <div class="label"><i class="fa-solid fa-wave-square"></i> Camera readings · 24 h</div>
+        <div class="value" id="k-read">–</div>
+        <div class="foot" id="k-read-foot"></div>
+        <div class="spark" id="k-read-spark"></div>
+      </div>
+    </section>
 
-  <!-- HEADER -->
-  <div class="page-container">
-    <header class="card main-header">
-      <div class="header-wrapper" style="width:100%;">
-        <div class="header-left" style="display:flex;align-items:center;gap:12px;">
-          <img src="/assets/logo.png" alt="logo" class="w-12 h-12 rounded" />
-        </div>
-        <div class="header-center">
-          <h1>Fire Monitoring Department</h1>
-        </div>
-        <div class="header-right" style="display:flex;align-items:center;gap:10px;">
-          <div class="text-right" style="margin-right:6px;">
-            <div id="auth-status" class="text-sm" style="color:var(--logo-green);">Connecting…</div>
-            <div id="current-time" class="text-xs text-gray-500">--</div>
+    <!-- Map + live feed -->
+    <section class="ops-grid fill-grow" style="margin-bottom:14px;">
+      <div class="panel-card span-8">
+        <div class="card-head">
+          <h2><i class="fa-solid fa-map-location-dot"></i> Live situation map</h2>
+          <span class="sub" id="map-sub"></span>
+          <div class="tools">
+            <div class="seg" role="group" aria-label="Basemap">
+              <button class="on" data-base="dark">Dark</button><button data-base="satellite">Satellite</button>
+            </div>
+            <a class="btn btn-sm" href="/map" title="Open the full-screen map"><i class="fa-solid fa-expand"></i> Full map</a>
           </div>
-          <div style="position:relative;">
-            <button id="menu-btn" class="p-2 rounded bg-gray-100"><i class="fa-solid fa-bars"></i></button>
-            <div id="menu-panel" class="menu-panel hidden card" aria-hidden="true" style="right:0;">
-              <div class="menu-header">
-                <img src="/assets/logo.png" alt="logo" class="w-7 h-7 rounded" />
-                <div style="font-weight:800;font-size:14px;">FIRO</div>
-              </div>
-              <a href="/dashboard"><i class="fa-solid fa-house"></i> Home</a>
-              <a href="/"><i class="fa-solid fa-globe"></i> Website</a>
-              <a href="/logs"><i class="fa-solid fa-list"></i> Logs</a>
-              <a href="/analytics"><i class="fa-solid fa-chart-line"></i> Analytics</a>
-              <a href="#" id="open-settings"><i class="fa-solid fa-gear"></i> Settings</a>
-              <hr class="my-2 opacity-30" />
-              <a href="#" id="logout-btn" style="color:#dc2626;">
-                <i class="fa-solid fa-right-from-bracket"></i> Logout
-              </a>
+        </div>
+        <div class="map-box"><div id="map"></div></div>
+      </div>
+
+      <div class="panel-card span-4">
+        <div class="card-head">
+          <h2><i class="fa-solid fa-tower-broadcast"></i> Live incidents</h2>
+          <span class="sub" id="feed-sub"></span>
+          <div class="tools">
+            <div class="seg" role="group" aria-label="Filter incidents">
+              <button class="on" data-feed="all">All</button><button data-feed="camera">Cameras</button><button data-feed="report">Reports</button>
             </div>
           </div>
         </div>
-      </div>
-    </header>
-  </div>
-
-  <!-- DASHBOARD CONTENT -->
-  <div class="page-container">
-    <!-- Stats row -->
-    <section class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-      <div class="card p-5">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xs uppercase" style="color:var(--logo-green);">Active Fires</div>
-            <div id="active-fires" class="text-3xl font-bold text-red-600">0</div>
-            <div class="text-xs text-gray-500 mt-1">Cameras reporting fire</div>
-          </div>
-          <i class="fa-solid fa-fire text-4xl" style="color:var(--logo-orange);opacity:0.9;"></i>
-        </div>
-      </div>
-      <div class="card p-5">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xs uppercase" style="color:var(--logo-green);">Last Updated</div>
-            <div id="last-update" class="text-2xl font-semibold" style="color:var(--logo-orange);">--</div>
-            <div class="text-xs text-gray-500 mt-1">Most recent alert</div>
-          </div>
-          <i class="fa-solid fa-clock text-3xl" style="color:var(--logo-orange);opacity:0.9;"></i>
-        </div>
-      </div>
-      <div class="card p-5">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xs uppercase" style="color:var(--logo-green);">Total Cameras</div>
-            <div id="total-cameras" class="text-3xl font-bold" style="color:var(--logo-green);">0</div>
-            <div class="text-xs text-gray-500 mt-1">Distinct camera locations</div>
-          </div>
-          <i class="fa-solid fa-camera text-3xl" style="color:var(--logo-green);opacity:0.9;"></i>
+        <div class="card-body flush grow scroll feed-scroll">
+          <ul class="feed" id="feed"><li class="empty"><i class="fa-solid fa-satellite-dish"></i>Connecting…</li></ul>
         </div>
       </div>
     </section>
 
-    <!-- Map + Alerts -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 card p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold" style="color:var(--logo-green);">Cameras Map</h3>
-          <div class="flex items-center gap-4 text-sm">
-            <div><span class="legend-dot" style="background:var(--logo-green)"></span>SAFE</div>
-            <div><span class="legend-dot blink" style="background:red"></span>FIRE DETECTED</div>
-          </div>
+    <!-- Activity + report status -->
+    <section class="ops-grid">
+      <div class="panel-card span-8" id="card-activity">
+        <div class="card-head">
+          <h2><i class="fa-solid fa-chart-column"></i> Activity, last 24 hours</h2>
+          <span class="sub">New incidents per hour</span>
+          <div class="tools"></div>
         </div>
-        <div class="flex gap-3 mb-3">
-          <select id="camera-select"
-            class="px-3 py-2 border rounded text-sm flex-1 bg-gray-50 text-gray-800 border-gray-300 focus:outline-none focus:ring-2 focus:ring-[var(--logo-green)]">
-            <option value="">-- Select camera --</option>
-          </select>
-          <button id="camera-clear" class="btn btn-clear small">Clear filter</button>
+        <div class="card-body">
+          <div class="chart-legend" id="activity-legend"></div>
+          <div class="chart" id="activity-chart" style="height:150px;"></div>
         </div>
-        <div id="map" class="card"></div>
       </div>
-
-      <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-lg font-semibold" style="color:var(--logo-green);">Live Fire Alert Log</h3>
-          <button id="clear-logs" class="btn btn-clear small">Clear</button>
+      <div class="panel-card span-4">
+        <div class="card-head">
+          <h2><i class="fa-solid fa-list-check"></i> Citizen reports by status</h2>
+          <span class="sub">All time</span>
+          <div class="tools"><a class="btn btn-sm" href="/incidents">Open desk</a></div>
         </div>
-        <div id="alert-list" class="overflow-y-auto" style="max-height:520px;">
-          <div class="text-sm text-gray-500 italic">Waiting for data…</div>
-        </div>
+        <div class="card-body" id="status-body"></div>
       </div>
     </section>
-  </div>
+  </main>
 
-  <!-- Settings Sidebar -->
-  <div id="settings-sidebar" class="settings-sidebar card" aria-hidden="true">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold" style="color:var(--logo-green);">Settings</h2>
-      <button id="close-settings" class="p-2 rounded"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="section">
-      <label class="block text-sm font-medium mb-2">Theme</label>
-      <button id="toggle-theme" class="btn w-full text-left">
-        <i class="fa-solid fa-moon mr-3"></i> Toggle Dark / Light
-      </button>
-    </div>
-    <div class="section mt-4">
-      <label class="block text-sm font-medium mb-2">Display</label>
-      <button id="fullscreen-toggle" class="btn w-full text-left">
-        <i class="fa-solid fa-expand mr-3"></i> Toggle Fullscreen
-      </button>
-    </div>
-  </div>
-
-  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Firebase + App Logic -->
   <script type="module">
-    import { initFirebase, fireLogsPath } from "/js/firebase-init.js";
-    import { esc, isActiveFire, isResolved, getLatLon, formatTime,
-             THEME_KEY, getSavedTheme, applyTheme, startClock, registerServiceWorker } from "/js/common.js";
-    import { signOut, onAuthStateChanged }
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { collection, onSnapshot, doc, updateDoc }
-      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { esc, registerServiceWorker } from "/js/common.js";
+    import {
+      startOps, watchLogs, watchReports, cameraSummary, cameraIncidents, unifiedFeed, median,
+      resolveCameraIds, whatsappLink, cameraMessage, reportMessage, timeAgo, fmtTime, fmtDuration, fmtNum,
+      REPORT_STATUS, OPEN_STATUSES, HOUR, DAY, pct,
+    } from "/js/ops/data.js";
+    import { renderShell, lockedHtml } from "/js/ops/shell.js";
+    import { createOpsMap } from "/js/ops/map.js";
+    import { columnChart, sparkline, stackedBar, renderLegend, tableToggle } from "/js/ops/charts.js";
 
     registerServiceWorker();
+    const ctx = await startOps();
+    const shell = renderShell("overview", ctx);
+    const $ = (id) => document.getElementById(id);
 
-    // ── Theme + clock (work even before Firebase is ready) ──
-    let theme = getSavedTheme();
-    applyTheme(theme);
-    startClock(document.getElementById("current-time"));
+    const SERIES = [
+      { key: "camera", name: "Camera incidents", color: "var(--s-camera)" },
+      { key: "report", name: "Citizen reports", color: "var(--s-report)" },
+    ];
 
-    // ── Init Firebase (config comes from /api/config) ──
-    let firebase;
-    try {
-      firebase = await initFirebase();
-    } catch (err) {
-      console.error(err);
-      const el = document.getElementById("auth-status");
-      el.textContent = "Config error — see console";
-      el.style.color = "#dc2626";
-      throw err;
-    }
-    const { auth, db, config, settings } = firebase;
+    let logs = [], reports = [], cams = [], incidents = [];
+    let seenInc = null, seenRep = null;   // ids already known (to detect new arrivals)
+    let logsLoaded = false, reportsLoaded = false;
+    const loadTime = Date.now();
+    let feedFilter = "all";
 
-    // ── Auth guard ──
-    onAuthStateChanged(auth, (user) => {
-      if (!user || user.isAnonymous) {
-        window.location.replace("/login");
+    /* ── Map ── */
+    const opsMap = createOpsMap($("map"), {
+      handlers: {
+        onResolveCamera: async (c) => {
+          if (!c || !confirm(`Mark the fire at ${c.name} as resolved?`)) return;
+          try { await resolveCameraIds(ctx, c.activeIds); shell.toast("Marked as resolved", "success"); }
+          catch (err) { console.error(err); shell.toast("Could not update. Check your permissions.", "error"); }
+        },
+        onWhatsappCamera: (c) => {
+          const inc = incidents.find((i) => i.camera === c.name) || { camera: c.name, lat: c.lat, lon: c.lon, start: c.lastTime };
+          window.open(whatsappLink(ctx.settings.whatsappNumber, cameraMessage(inc)), "_blank");
+        },
+        onWhatsappReport: (r) => window.open(whatsappLink(ctx.settings.whatsappNumber, reportMessage(r)), "_blank"),
+      },
+    });
+    document.querySelectorAll("[data-base]").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("[data-base]").forEach((x) => x.classList.toggle("on", x === b));
+      opsMap.setBase(b.dataset.base);
+    }));
+
+    /* ── Charts ── */
+    renderLegend($("activity-legend"), SERIES, "rect");
+    const activity = columnChart($("activity-chart"), { title: "Incidents per hour", xName: "Hour" });
+    tableToggle($("card-activity"), $("activity-chart"), () => activity.table());
+
+    /* ── Feed ── */
+    document.querySelectorAll("[data-feed]").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("[data-feed]").forEach((x) => x.classList.toggle("on", x === b));
+      feedFilter = b.dataset.feed;
+      renderFeed();
+    }));
+    $("feed").addEventListener("click", (e) => {
+      const li = e.target.closest("[data-id]");
+      if (!li) return;
+      if (li.dataset.kind === "camera") opsMap.focusCamera(li.dataset.cam);
+      else if (!opsMap.focusReport(li.dataset.id)) window.location.href = `/incidents#${li.dataset.id}`;
+    });
+    $("feed").addEventListener("keydown", (e) => { if (e.key === "Enter") e.target.closest("[data-id]")?.click(); });
+
+    function itemTitle(i) { return i.kind === "camera" ? i.camera : `${i.typeInfo.label} · ${i.place}`; }
+
+    function renderFeed() {
+      const items = unifiedFeed(incidents, ctx.isStaff ? reports : [])
+        .filter((i) => feedFilter === "all" || i.kind === feedFilter).slice(0, 80);
+      const open = items.filter((i) => i.open).length;
+      $("feed-sub").textContent = `${open} open`;
+      if (!items.length) {
+        $("feed").innerHTML = `<li class="empty"><i class="fa-solid fa-leaf"></i>No incidents yet</li>`;
         return;
       }
-      const el = document.getElementById("auth-status");
-      if (el) el.textContent = user.email;
-    });
-
-    document.getElementById("logout-btn").addEventListener("click", async (e) => {
-      e.preventDefault();
-      await signOut(auth);
-      window.location.replace("/login");
-    });
-
-    // ── Map ──
-    const map = L.map("map", { zoomControl: true }).setView([33.7380, 73.0845], 14);
-    L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { attribution: "Tiles © Esri" }
-    ).addTo(map);
-
-    // ── DOM refs ──
-    const activeFiresEl  = document.getElementById("active-fires");
-    const totalCamerasEl = document.getElementById("total-cameras");
-    const lastUpdateEl   = document.getElementById("last-update");
-    const alertList      = document.getElementById("alert-list");
-    const cameraSelect   = document.getElementById("camera-select");
-    const cameraClear    = document.getElementById("camera-clear");
-    const settingsSidebar= document.getElementById("settings-sidebar");
-    const menuBtn        = document.getElementById("menu-btn");
-    const menuPanel      = document.getElementById("menu-panel");
-    const toggleThemeBtn = document.getElementById("toggle-theme");
-    const fullscreenBtn  = document.getElementById("fullscreen-toggle");
-    const clearLogsBtn   = document.getElementById("clear-logs");
-
-    const cameraMarkers = new Map();
-
-    function makeIcon(color, blink = false) {
-      const el = document.createElement("div");
-      el.className = "marker-dot" + (blink ? " blink" : "");
-      el.style.background = color;
-      return L.divIcon({ html: el.outerHTML, className: "", iconSize: [20, 20], iconAnchor: [10, 10] });
-    }
-
-    // Firestore collection: artifacts/{projectId}/public/data/fire_logs
-    const q = collection(db, ...fireLogsPath(config));
-
-    onSnapshot(q, (snap) => {
-      const cameras = new Map();
-      const alerts  = [];
-      let latestTime = 0;
-
-      snap.forEach((d) => {
-        const e = d.data(); e.id = d.id;
-        const pos = getLatLon(e);
-        if (!pos) return;
-
-        alerts.push(e);
-        if (e.timestamp_ms && e.timestamp_ms > latestTime) latestTime = e.timestamp_ms;
-
-        const camName = e.camera_location || e.id;
-        const prev    = cameras.get(camName) || { lat: pos.lat, lon: pos.lon, latestTS: 0, fire: false, docs: [] };
-        prev.lat = pos.lat; prev.lon = pos.lon; prev.docs.push(e);
-        if (isActiveFire(e)) prev.fire = true;
-        if (e.timestamp_ms && e.timestamp_ms > prev.latestTS) prev.latestTS = e.timestamp_ms;
-        cameras.set(camName, prev);
-      });
-
-      activeFiresEl.textContent  = Array.from(cameras.values()).filter(c => c.fire).length;
-      totalCamerasEl.textContent = cameras.size;
-      lastUpdateEl.textContent   = latestTime ? new Date(latestTime).toLocaleString() : "--";
-
-      // Remove stale markers
-      cameraMarkers.forEach((marker, name) => {
-        if (!cameras.has(name)) { try { map.removeLayer(marker); } catch (e) {} cameraMarkers.delete(name); }
-      });
-
-      // Add / update markers
-      cameras.forEach((cam, name) => {
-        const latlng = [cam.lat, cam.lon];
-        const color  = cam.fire ? "red" : "#2B8E4E";
-        if (cameraMarkers.has(name)) {
-          const m = cameraMarkers.get(name);
-          m.setLatLng(latlng).setIcon(makeIcon(color, cam.fire));
-          m.getPopup() && m.setPopupContent(buildPopup(name, cam));
-        } else {
-          const m = L.marker(latlng, { icon: makeIcon(color, cam.fire) }).addTo(map);
-          m.bindPopup(buildPopup(name, cam));
-          cameraMarkers.set(name, m);
-        }
-      });
-
-      const bounds = L.latLngBounds([]);
-      cameraMarkers.forEach(m => bounds.extend(m.getLatLng()));
-      if (bounds.isValid() && !cameraSelect.value) map.fitBounds(bounds, { padding: [40, 40] });
-
-      // Sort: active fires first, then by time desc
-      alerts.sort((a, b) => {
-        const af = isActiveFire(a), bf = isActiveFire(b);
-        if (af && !bf) return -1; if (!af && bf) return 1;
-        return (b.timestamp_ms || 0) - (a.timestamp_ms || 0);
-      });
-
-      alertList.innerHTML = "";
-      if (alerts.length === 0) {
-        alertList.innerHTML = `<div class="text-sm text-gray-500 italic">No alerts</div>`;
-      } else {
-        alerts.forEach(a => {
-          const fire = isActiveFire(a);
-          const { lat, lon } = getLatLon(a);
-          const card = document.createElement("div");
-          card.className = "rounded p-3 mb-3 " + (fire ? "alert-card-fire" : "alert-card-safe");
-          card.innerHTML = `
-            <div class="flex justify-between items-start">
-              <div class="font-semibold">${esc(a.camera_location || a.id)}</div>
-              <div class="text-xs ${fire ? "text-red-700" : "text-green-700"}">
-                ${esc(a.detection_class)}${isResolved(a) ? " (resolved)" : ""}
+      $("feed").innerHTML = items.map((i) => {
+        const known = i.kind === "camera" ? seenInc : seenRep;
+        const fresh = known && !known.has(i.id) && i.time > loadTime ? " fresh" : "";
+        if (i.kind === "camera") {
+          return `<li class="feed-item${fresh}" tabindex="0" data-id="${esc(i.id)}" data-kind="camera" data-cam="${esc(i.camera)}">
+            <span class="sev-bar ${i.active ? "critical" : "good"}"></span>
+            <div class="feed-main">
+              <div class="feed-top"><span class="feed-title">${esc(i.camera)}</span>
+                <span class="feed-time" title="${esc(new Date(i.start).toLocaleString())}">${esc(timeAgo(i.start))}</span></div>
+              <div class="feed-meta">
+                <span class="pill camera"><i class="fa-solid fa-video"></i> Camera</span>
+                ${i.active ? '<span class="pill critical"><i class="fa-solid fa-fire"></i> Active</span>' : '<span class="pill good"><i class="fa-solid fa-check"></i> Resolved</span>'}
+                <span>Peak ${pct(i.peak)} · ${i.count} reading${i.count > 1 ? "s" : ""}</span>
               </div>
+            </div></li>`;
+        }
+        const st = REPORT_STATUS[i.status];
+        return `<li class="feed-item${fresh}" tabindex="0" data-id="${esc(i.id)}" data-kind="report">
+          <span class="sev-bar ${i.open ? i.sev : "good"}"></span>
+          <div class="feed-main">
+            <div class="feed-top"><span class="feed-title">${esc(itemTitle(i))}</span>
+              <span class="feed-time" title="${esc(new Date(i.time).toLocaleString())}">${esc(timeAgo(i.time))}</span></div>
+            <div class="feed-meta">
+              <span class="pill report"><i class="fa-solid ${i.typeInfo.icon}"></i> Report</span>
+              <span class="pill ${st.pill}"><i class="fa-solid ${st.icon}"></i> ${esc(st.label)}</span>
+              <span class="mono">#${esc(i.ref)}</span>
             </div>
-            <div class="text-xs text-gray-500 mt-2">Coords: ${lat}, ${lon}</div>
-            <div class="text-xs text-gray-500">Prob: ${esc(a.fire_probability ?? 0)}</div>
-            <div class="text-xs text-gray-500 mb-2">Time: ${esc(formatTime(a))}</div>
-            <div class="flex justify-end gap-2">
-              <button class="btn btn-send small send"
-                data-lat="${lat}" data-lon="${lon}" data-name="${esc(a.camera_location || a.id)}">
-                Send
-              </button>
-              ${fire ? `<button class="btn btn-resolve small resolve" data-id="${esc(a.id)}">Resolved</button>` : ""}
-            </div>`;
-          alertList.appendChild(card);
-        });
-      }
-
-      // Populate camera dropdown (keep current selection)
-      const selected = cameraSelect.value;
-      const sorted = Array.from(cameras.keys()).sort((x, y) => x.localeCompare(y));
-      cameraSelect.innerHTML = '<option value="">-- Select camera --</option>';
-      sorted.forEach(name => {
-        const o = document.createElement("option");
-        o.value = name; o.textContent = name;
-        cameraSelect.appendChild(o);
-      });
-      if (cameras.has(selected)) cameraSelect.value = selected;
-    }, (err) => {
-      console.error("[FIRO] Firestore listener error:", err);
-      alertList.innerHTML = `<div class="text-sm text-red-600">Could not load alerts: ${esc(err.message)}</div>`;
-    });
-
-    function buildPopup(name, cam) {
-      const status = cam.fire ? "FIRE DETECTED" : "SAFE";
-      const t      = cam.latestTS ? new Date(cam.latestTS).toLocaleString() : "--";
-      return `<div style="min-width:180px"><strong>${esc(name)}</strong><br/>
-              ${cam.lat.toFixed(6)}, ${cam.lon.toFixed(6)}<br/>
-              <small>${status} · ${t}</small></div>`;
+          </div></li>`;
+      }).join("");
     }
 
-    // ── Alert list clicks (send / resolve) ──
-    alertList.addEventListener("click", async (ev) => {
-      const t = ev.target.closest("button");
-      if (!t) return;
-      if (t.classList.contains("send")) {
-        const { lat, lon, name } = t.dataset;
-        const text =
-          `🚨 Fire detected at ${name}\n` +
-          `Coordinates: ${lat}, ${lon}\n` +
-          `Map: https://www.google.com/maps?q=${lat},${lon}\n` +
-          `Time: ${new Date().toLocaleString()}\n\n` +
-          `🔥 آگ لگی ہوئی ہے — براہ کرم فوری کارروائی کریں۔`;
-        window.open(`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(text)}`, "_blank");
+    /* ── KPIs, banner, charts ── */
+    function delta(el, now, prev) {
+      if (!prev && !now) { el.innerHTML = '<span class="delta">no change</span> vs previous 24 h'; return; }
+      const d = now - prev;
+      const cls = d > 0 ? "up-bad" : d < 0 ? "down-good" : "";
+      el.innerHTML = `<span class="delta ${cls}">${d > 0 ? "▲" : d < 0 ? "▼" : "="} ${Math.abs(d)}</span> vs previous 24 h`;
+    }
+
+    function hourly(items, getTime, now) {
+      const start = Math.floor(now / HOUR) * HOUR - 23 * HOUR;
+      const counts = new Array(24).fill(0);
+      for (const it of items) {
+        const t = getTime(it);
+        if (t >= start) counts[Math.min(23, Math.floor((t - start) / HOUR))]++;
       }
-      if (t.classList.contains("resolve")) {
-        const id = t.dataset.id; if (!id) return;
-        if (!confirm("Mark this alert as resolved and set camera SAFE?")) return;
-        try {
-          const ref = doc(db, ...fireLogsPath(config), id);
-          await updateDoc(ref, { detection_class: "SAFE", fire_probability: 0, status: "resolved" });
-        } catch (err) { console.error("Resolve failed", err); alert("Failed (see console)."); }
+      return { start, counts };
+    }
+
+    function render() {
+      const now = Date.now();
+      cams = cameraSummary(logs, now);
+      incidents = cameraIncidents(logs);
+      const visibleReports = ctx.isStaff ? reports : [];
+
+      // KPI: active fires (cameras)
+      const fireCams = cams.filter((c) => c.active);
+      $("k-fires").textContent = fireCams.length;
+      $("kpi-fires").classList.toggle("alarm", fireCams.length > 0);
+      $("k-fires-foot").textContent = fireCams.length
+        ? `${fireCams.map((c) => c.name).slice(0, 2).join(", ")}${fireCams.length > 2 ? "…" : ""}`
+        : "All cameras clear";
+
+      // KPI: open reports
+      if (ctx.isStaff) {
+        const open = reports.filter((r) => r.open);
+        $("k-open").textContent = open.length;
+        const nNew = reports.filter((r) => r.status === "new").length;
+        const nVer = reports.filter((r) => r.status === "verified").length;
+        $("k-open-foot").textContent = `${nNew} new · ${nVer} verified fire`;
+        shell.setBadge("incidents", nNew);
+      } else {
+        $("k-open").textContent = "—";
+        $("k-open-foot").innerHTML = '<i class="fa-solid fa-lock"></i> Staff only';
       }
-    });
 
-    // ── Camera filter ──
-    cameraSelect.addEventListener("change", () => {
-      const name = cameraSelect.value; if (!name) return;
-      const m = cameraMarkers.get(name);
-      if (m) { map.flyTo(m.getLatLng(), 17, { duration: 0.6 }); try { m.openPopup(); } catch(e){} }
-    });
-    cameraClear.addEventListener("click", () => {
-      cameraSelect.value = "";
-      const bounds = L.latLngBounds([]);
-      cameraMarkers.forEach(m => bounds.extend(m.getLatLng()));
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
-    });
+      // KPI: cameras online
+      const online = cams.filter((c) => c.online).length;
+      $("k-online").innerHTML = `${online}<small>/ ${cams.length}</small>`;
+      const last = Math.max(0, ...cams.map((c) => c.lastTime));
+      $("k-online-foot").textContent = last ? `Last reading ${timeAgo(last)}` : "No readings yet";
 
-    // ── Menu ──
-    menuBtn.addEventListener("click", () => menuPanel.classList.toggle("hidden"));
+      // KPI: incidents 24 h (+ delta, hourly sparkline)
+      const inWin = (t, a, b) => t >= a && t < b;
+      const n24 = incidents.filter((i) => inWin(i.start, now - DAY, now + 1)).length
+        + visibleReports.filter((r) => inWin(r.time, now - DAY, now + 1)).length;
+      const p24 = incidents.filter((i) => inWin(i.start, now - 2 * DAY, now - DAY)).length
+        + visibleReports.filter((r) => inWin(r.time, now - 2 * DAY, now - DAY)).length;
+      $("k-24h").textContent = n24;
+      delta($("k-24h-foot"), n24, p24);
+      const hCam = hourly(incidents, (i) => i.start, now);
+      const hRep = hourly(visibleReports, (r) => r.time, now);
+      sparkline($("k-24h-spark"), hCam.counts.map((v, i) => v + hRep.counts[i]), { color: "var(--fire)" });
 
-    // ── Settings sidebar ──
-    document.getElementById("open-settings").addEventListener("click", (e) => {
-      e.preventDefault(); menuPanel.classList.add("hidden");
-      settingsSidebar.classList.add("active");
-      settingsSidebar.setAttribute("aria-hidden", "false");
-    });
-    document.getElementById("close-settings").addEventListener("click", () => {
-      settingsSidebar.classList.remove("active");
-      settingsSidebar.setAttribute("aria-hidden", "true");
-    });
+      // KPI: time to acknowledge (median, 7 days)
+      if (ctx.isStaff) {
+        const acked = reports.filter((r) => r.ackMs && r.time >= now - 7 * DAY);
+        $("k-ack").textContent = acked.length ? fmtDuration(median(acked.map((r) => r.ackMs - r.time))) : "—";
+        $("k-ack-foot").textContent = `Median of ${acked.length} report${acked.length === 1 ? "" : "s"}, last 7 days`;
+      } else {
+        $("k-ack").textContent = "—";
+        $("k-ack-foot").innerHTML = '<i class="fa-solid fa-lock"></i> Staff only';
+      }
 
-    // ── Theme toggle ──
-    toggleThemeBtn.addEventListener("click", () => { theme = theme === "light" ? "dark" : "light"; applyTheme(theme); });
-    // Follow theme changes made on the Settings page (other tab or opener message)
-    window.addEventListener("storage", (e) => {
-      if (e.key === THEME_KEY && e.newValue) { theme = e.newValue; applyTheme(theme); }
-    });
-    window.addEventListener("message", (e) => {
-      if (e.origin === window.location.origin && e.data?.action === "setTheme") { theme = e.data.value; applyTheme(theme); }
-    });
+      // KPI: readings 24 h
+      const hRead = hourly(logs, (l) => l.time, now);
+      $("k-read").textContent = fmtNum(hRead.counts.reduce((a, b) => a + b, 0));
+      $("k-read-foot").textContent = `${cams.length} camera${cams.length === 1 ? "" : "s"} reporting`;
+      sparkline($("k-read-spark"), hRead.counts, { color: "var(--s-camera)" });
 
-    // ── Fullscreen ──
-    fullscreenBtn.addEventListener("click", () => {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-      else document.exitFullscreen();
-    });
+      // Map
+      opsMap.setCameras(cams);
+      opsMap.setReports(visibleReports.filter((r) => r.open || now - r.time < 7 * DAY));
+      const mc = opsMap.counts();
+      $("map-sub").textContent = `${mc.cameras} cameras · ${mc.reports} reports shown`;
 
-    // ── Clear logs ──
-    clearLogsBtn.addEventListener("click", () => {
-      alertList.innerHTML = `<div class="text-sm text-gray-500 italic">Cleared. New alerts will appear here.</div>`;
-    });
+      // Activity chart
+      activity.update({
+        series: SERIES,
+        buckets: hCam.counts.map((v, i) => {
+          const t = hCam.start + i * HOUR;
+          return {
+            label: new Date(t).toLocaleTimeString([], { hour: "2-digit" }),
+            tipLabel: `${fmtTime(t)} – ${fmtTime(t + HOUR)}`,
+            values: { camera: v, report: hRep.counts[i] },
+          };
+        }),
+      });
+
+      // Report status
+      if (ctx.isStaff) {
+        stackedBar($("status-body"), Object.entries(REPORT_STATUS).map(([k, s]) => ({
+          label: s.label, icon: s.icon, value: reports.filter((r) => r.status === k).length,
+          color: `var(--${ { new: "critical", reviewing: "warning", verified: "serious", resolved: "good", dismissed: "offline" }[k] })`,
+        })));
+      } else {
+        $("status-body").innerHTML = lockedHtml(ctx);
+      }
+
+      // Alert banner: active camera fires + open critical reports
+      const alerts = [
+        ...incidents.filter((i) => i.active).map((i) => ({ kind: "camera", ref: i, title: `Fire detected at ${i.camera}`, sub: `Since ${fmtTime(i.start)} · peak ${pct(i.peak)}` })),
+        ...visibleReports.filter((r) => r.open && r.sev === "critical").map((r) => ({ kind: "report", ref: r, title: `${r.typeInfo.label} reported at ${r.place}`, sub: `${REPORT_STATUS[r.status].label} · ${timeAgo(r.time)}` })),
+      ];
+      shell.alertBanner(alerts, (a) => a.kind === "camera" ? opsMap.focusCamera(a.ref.camera) : opsMap.focusReport(a.ref.id));
+
+      renderFeed();
+
+      // New arrivals → toast + sound (only after each source's first load)
+      if (logsLoaded) {
+        if (seenInc) for (const i of incidents) if (!seenInc.has(i.id) && i.active) shell.notify(`🔥 Camera fire detected: ${i.camera}`);
+        seenInc = new Set(incidents.map((i) => i.id));
+      }
+      if (reportsLoaded) {
+        if (seenRep) for (const r of reports) if (!seenRep.has(r.id)) shell.notify(`📣 New citizen report: ${r.typeInfo.label} at ${r.place}`);
+        seenRep = new Set(reports.map((r) => r.id));
+      }
+    }
+
+    /* ── Live data ── */
+    let renderQueued = false;
+    const schedule = () => { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); } };
+
+    watchLogs(ctx, (data, meta) => { logs = data; logsLoaded = true; shell.setLive(!meta.fromCache); schedule(); },
+      (err) => { console.error(err); shell.setLive(false); shell.toast(`Camera data unavailable: ${err.code || err.message}`, "error"); });
+    if (ctx.isStaff) {
+      watchReports(ctx, (data) => { reports = data; reportsLoaded = true; schedule(); },
+        (err) => { console.error(err); shell.toast(`Citizen reports unavailable: ${err.code || err.message}`, "error"); });
+    }
+    window.addEventListener("online", () => shell.setLive(true));
+    window.addEventListener("offline", () => shell.setLive(false));
+    setInterval(render, 30000);   // keep "x min ago" and online status fresh
   </script>
 </body>
 </html>

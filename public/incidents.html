@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Citizen Reports — FIRO Control Room</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0a100e" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/ops.css" />
+  <style>
+    .detail-head { display: flex; gap: 14px; align-items: flex-start; }
+    .detail-head .ic { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font-size: 1.3rem; background: var(--surface-3); flex-shrink: 0; }
+    .detail-head .ic.critical { background: rgba(208,59,59,.2); color: #ffb3b3; }
+    .detail-head .ic.serious { background: rgba(236,131,90,.18); color: #ffc2a8; }
+    .detail-head .ic.warning { background: rgba(250,178,25,.16); color: #ffd47a; }
+    .detail-head h2 { margin: 0 0 4px; font-size: 1.3rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mini-map { height: 190px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .mini-map .leaflet-container { height: 100%; background: #0d1412; }
+    .section-title { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; }
+    .desc { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; }
+    .count-chip { font-size: .72rem; color: var(--ink-3); margin-left: 4px; }
+    .seg button.on .count-chip { color: var(--ink-2); }
+  </style>
+</head>
+<body class="ops fill">
+  <header id="topbar"></header>
+
+  <main class="ops-main">
+    <div class="filter-row">
+      <span class="label">Status</span>
+      <div class="seg" id="status-filter" role="group" aria-label="Filter by status"></div>
+      <span class="label" style="margin-left:6px;">Type</span>
+      <select class="input" id="type-filter" aria-label="Filter by type">
+        <option value="">All types</option>
+        <option value="near_homes">Fire near homes</option>
+        <option value="large_fire">Large fire</option>
+        <option value="small_fire">Small fire</option>
+        <option value="smoke">Smoke</option>
+      </select>
+      <input class="input" id="search" type="search" placeholder="Search place, name, phone, ref…" style="min-width:240px;" aria-label="Search reports" />
+      <span class="muted" id="result-count" style="margin-left:auto;font-size:.85rem;"></span>
+    </div>
+
+    <section class="ops-grid fill-grow" id="desk">
+      <!-- Queue -->
+      <div class="panel-card span-4">
+        <div class="card-head"><h2><i class="fa-solid fa-inbox"></i> Report queue</h2><span class="sub">Newest first · ↑ ↓ to move</span></div>
+        <div class="card-body flush grow scroll feed-scroll">
+          <ul class="feed" id="queue"><li class="empty"><i class="fa-solid fa-satellite-dish"></i>Connecting…</li></ul>
+        </div>
+      </div>
+
+      <!-- Detail -->
+      <div class="panel-card span-5">
+        <div class="card-body grow scroll" id="detail">
+          <div class="empty"><i class="fa-solid fa-hand-pointer"></i>Select a report from the queue</div>
+        </div>
+      </div>
+
+      <!-- Side analytics -->
+      <div class="panel-card span-3">
+        <div class="card-head"><h2><i class="fa-solid fa-chart-simple"></i> Last 14 days</h2></div>
+        <div class="card-body grow scroll" style="display:grid;gap:18px;align-content:start;">
+          <div>
+            <p class="section-title">Reports per day</p>
+            <div class="chart" id="per-day" style="height:130px;"></div>
+          </div>
+          <div>
+            <p class="section-title">By type</p>
+            <div id="by-type"></div>
+          </div>
+          <div>
+            <p class="section-title">Response time (median)</p>
+            <dl class="kv" id="resp"></dl>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="photo-modal" role="dialog" aria-label="Report photo"><img id="photo-full" alt="Report photo" /></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { esc, registerServiceWorker } from "/js/common.js";
+    import {
+      startOps, watchReports, setReportStatus, whatsappLink, reportMessage, median,
+      timeAgo, fmtDateTime, fmtDuration, REPORT_TYPES, REPORT_STATUS, OPEN_STATUSES, DAY,
+    } from "/js/ops/data.js";
+    import { renderShell, lockedHtml } from "/js/ops/shell.js";
+    import { columnChart, barList } from "/js/ops/charts.js";
+
+    registerServiceWorker();
+    const ctx = await startOps();
+    const shell = renderShell("incidents", ctx);
+    const $ = (id) => document.getElementById(id);
+
+    if (!ctx.isStaff) {
+      $("desk").innerHTML = `<div class="panel-card span-12">${lockedHtml(ctx)}</div>`;
+      document.querySelector(".filter-row").hidden = true;
+      shell.setLive(true);
+      await new Promise(() => {});   // stop here; nothing else to show
+    }
+
+    const FILTERS = [
+      { key: "open", label: "Open", test: (r) => r.open },
+      { key: "new", label: "New", test: (r) => r.status === "new" },
+      { key: "reviewing", label: "Reviewing", test: (r) => r.status === "reviewing" },
+      { key: "verified", label: "Verified", test: (r) => r.status === "verified" },
+      { key: "closed", label: "Closed", test: (r) => !r.open },
+      { key: "all", label: "All", test: () => true },
+    ];
+    let reports = [], selectedId = decodeURIComponent(location.hash.slice(1)) || null;
+    let statusFilter = "open", seen = null, miniMap = null;
+
+    const perDay = columnChart($("per-day"), { title: "Reports per day", xName: "Day" });
+    const byType = barList($("by-type"), { xName: "Type" });
+
+    function filtered() {
+      const f = FILTERS.find((x) => x.key === statusFilter);
+      const type = $("type-filter").value;
+      const q = $("search").value.trim().toLowerCase();
+      return reports.filter((r) => f.test(r) && (!type || r.type === type) &&
+        (!q || `${r.place} ${r.name} ${r.phone} ${r.ref} ${r.description}`.toLowerCase().includes(q)));
+    }
+
+    function renderFilters() {
+      $("status-filter").innerHTML = FILTERS.map((f) =>
+        `<button class="${f.key === statusFilter ? "on" : ""}" data-f="${f.key}">${f.label}<span class="count-chip num">${reports.filter(f.test).length}</span></button>`).join("");
+    }
+    $("status-filter").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-f]"); if (!b) return;
+      statusFilter = b.dataset.f; render();
+    });
+    $("type-filter").addEventListener("change", render);
+    $("search").addEventListener("input", render);
+
+    function renderQueue(list) {
+      $("result-count").textContent = `${list.length} report${list.length === 1 ? "" : "s"}`;
+      $("queue").innerHTML = list.length ? list.map((r) => {
+        const st = REPORT_STATUS[r.status];
+        const fresh = seen && !seen.has(r.id) ? " fresh" : "";
+        return `<li class="feed-item${r.id === selectedId ? " selected" : ""}${fresh}" tabindex="0" data-id="${esc(r.id)}">
+          <span class="sev-bar ${r.open ? r.sev : "good"}"></span>
+          <div class="feed-main">
+            <div class="feed-top"><span class="feed-title"><i class="fa-solid ${r.typeInfo.icon}" style="color:var(--ink-3);margin-right:6px;"></i>${esc(r.place)}</span>
+              <span class="feed-time">${esc(timeAgo(r.time))}</span></div>
+            <div class="feed-meta">
+              <span class="pill ${st.pill}"><i class="fa-solid ${st.icon}"></i> ${esc(st.label)}</span>
+              <span>${esc(r.typeInfo.label)}</span>
+              <span class="mono">#${esc(r.ref)}</span>
+              ${r.photo ? '<i class="fa-solid fa-image" title="Has photo"></i>' : ""}
+            </div>
+          </div></li>`;
+      }).join("") : `<li class="empty"><i class="fa-solid fa-inbox"></i>No reports in this view</li>`;
+    }
+
+    function stepper(r) {
+      const steps = [
+        ["Received", true],
+        ["Acknowledged", !!r.ackMs || r.status !== "new"],
+        ["Verified", r.status === "verified" || (r.status === "resolved")],
+        [r.status === "dismissed" ? "Dismissed" : "Resolved", !r.open],
+      ];
+      return `<div class="stepper">${steps.map(([l, done], i) =>
+        `${i ? '<span class="sep"></span>' : ""}<span class="step ${done ? "done" : ""}"><span class="dot"></span>${l}</span>`).join("")}</div>`;
+    }
+
+    function actionButtons(r) {
+      const b = (status, label, icon, cls = "") => `<button class="btn ${cls}" data-status="${status}"><i class="fa-solid ${icon}"></i> ${label}</button>`;
+      const s = r.status;
+      let html = "";
+      if (s === "new") html += b("reviewing", "Acknowledge", "fa-eye", "btn-brand");
+      if (s === "new" || s === "reviewing") html += b("verified", "Verify fire", "fa-fire", "btn-critical");
+      if (s === "reviewing" || s === "verified") html += b("resolved", "Resolve", "fa-circle-check", "btn-brand");
+      if (s === "new" || s === "reviewing") html += b("dismissed", "Dismiss", "fa-ban");
+      if (!r.open) html += b("reviewing", "Reopen", "fa-rotate-left");
+      return html;
+    }
+
+    let lastDetailKey = "";
+    function renderDetail(force = false) {
+      const r = reports.find((x) => x.id === selectedId);
+      const el = $("detail");
+      const key = r ? JSON.stringify([r.id, r.status, r.ackMs, r.resolvedMs, r.handledBy]) : "";
+      if (!force && key === lastDetailKey) return;   // unchanged: keep scroll position and mini map
+      lastDetailKey = key;
+      if (!r) { el.innerHTML = `<div class="empty"><i class="fa-solid fa-hand-pointer"></i>Select a report from the queue</div>`; return; }
+      const st = REPORT_STATUS[r.status];
+      el.innerHTML = `
+        <div style="display:grid;gap:16px;">
+          <div class="detail-head">
+            <div class="ic ${r.open ? r.sev : ""}"><i class="fa-solid ${r.typeInfo.icon}"></i></div>
+            <div style="flex:1;min-width:0;">
+              <h2>${esc(r.place)}</h2>
+              <div class="feed-meta" style="margin:0;">
+                <span class="pill ${r.sev}"><i class="fa-solid ${r.typeInfo.icon}"></i> ${esc(r.typeInfo.label)}</span>
+                <span class="pill ${st.pill}"><i class="fa-solid ${st.icon}"></i> ${esc(st.label)}</span>
+                <span class="mono">#${esc(r.ref)}</span>
+                <span>${esc(timeAgo(r.time))}</span>
+              </div>
+            </div>
+          </div>
+          ${stepper(r)}
+          <div class="actions">
+            ${actionButtons(r)}
+            <button class="btn" id="wa"><i class="fa-brands fa-whatsapp"></i> Forward</button>
+            ${r.phone ? `<a class="btn" href="tel:${esc(r.phone)}"><i class="fa-solid fa-phone"></i> Call reporter</a>` : ""}
+            ${r.lat != null ? `<a class="btn" href="/map#${encodeURIComponent(r.id)}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Live map</a>` : ""}
+          </div>
+          ${r.description ? `<div><p class="section-title">What the reporter saw</p><div class="desc">${esc(r.description)}</div></div>` : ""}
+          ${r.photo ? `<div><p class="section-title">Photo</p><img class="photo-lg" id="photo" src="${esc(r.photo)}" alt="Photo sent with the report" /></div>` : ""}
+          ${r.lat != null ? `<div><p class="section-title">Location</p><div class="mini-map"><div id="mini"></div></div></div>` : ""}
+          <div>
+            <p class="section-title">Details</p>
+            <dl class="kv">
+              <dt>Reported</dt><dd>${esc(fmtDateTime(r.time))}</dd>
+              <dt>Reporter</dt><dd>${esc(r.name || "Anonymous")}</dd>
+              <dt>Phone</dt><dd>${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : "—"}</dd>
+              <dt>Coordinates</dt><dd class="mono">${r.lat != null ? `${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}${r.accuracy ? ` (±${esc(r.accuracy)} m)` : ""}` : "Not shared"}</dd>
+              <dt>Acknowledged</dt><dd>${r.ackMs ? `${esc(fmtDateTime(r.ackMs))} · <b>${esc(fmtDuration(r.ackMs - r.time))}</b> after report` : "—"}</dd>
+              <dt>Closed</dt><dd>${r.resolvedMs ? `${esc(fmtDateTime(r.resolvedMs))} · <b>${esc(fmtDuration(r.resolvedMs - r.time))}</b> after report` : "—"}</dd>
+              <dt>Handled by</dt><dd>${esc(r.handledBy || "—")}</dd>
+            </dl>
+          </div>
+        </div>`;
+
+      el.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await setReportStatus(ctx, r, b.dataset.status); shell.toast(`Report #${r.ref}: ${REPORT_STATUS[b.dataset.status].label}`, "success"); }
+        catch (err) { console.error(err); shell.toast("Could not update the report. Check your permissions.", "error"); b.disabled = false; }
+      }));
+      $("wa").addEventListener("click", () => window.open(whatsappLink(ctx.settings.whatsappNumber, reportMessage(r)), "_blank"));
+      $("photo")?.addEventListener("click", () => { $("photo-full").src = r.photo; $("photo-modal").classList.add("open"); });
+
+      if (miniMap) { miniMap.remove(); miniMap = null; }
+      if (r.lat != null) {
+        miniMap = L.map("mini", { zoomControl: false, attributionControl: false, dragging: true, scrollWheelZoom: false }).setView([r.lat, r.lon], 15);
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }).addTo(miniMap);
+        L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: `<div class="mk report ${r.sev === "critical" ? "critical pulse" : ""}"></div>`, iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(miniMap);
+        if (r.accuracy) L.circle([r.lat, r.lon], { radius: r.accuracy, color: "#d95926", weight: 1, fillOpacity: 0.08 }).addTo(miniMap);
+      }
+    }
+    $("photo-modal").addEventListener("click", () => $("photo-modal").classList.remove("open"));
+
+    function select(id) {
+      selectedId = id;
+      history.replaceState(null, "", `#${encodeURIComponent(id)}`);
+      document.querySelectorAll("#queue [data-id]").forEach((li) => li.classList.toggle("selected", li.dataset.id === id));
+      renderDetail(true);
+    }
+    $("queue").addEventListener("click", (e) => { const li = e.target.closest("[data-id]"); if (li) select(li.dataset.id); });
+    document.addEventListener("keydown", (e) => {
+      if (e.target.closest("input, select, textarea")) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const list = filtered();
+      if (!list.length) return;
+      const i = list.findIndex((r) => r.id === selectedId);
+      const next = list[Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
+      select(next.id);
+      document.querySelector(`#queue [data-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: "nearest" });
+      e.preventDefault();
+    });
+
+    function renderSide() {
+      const now = Date.now();
+      const start = new Date(now - 13 * DAY); start.setHours(0, 0, 0, 0);
+      const days = Array.from({ length: 14 }, (_, i) => start.getTime() + i * DAY);
+      const recent = reports.filter((r) => r.time >= start.getTime());
+      perDay.update({
+        series: [{ key: "r", name: "Reports", color: "var(--s-report)" }],
+        buckets: days.map((d) => ({
+          label: new Date(d).toLocaleDateString([], { day: "numeric" }),
+          tipLabel: new Date(d).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }),
+          values: { r: recent.filter((r) => r.time >= d && r.time < d + DAY).length },
+        })),
+      });
+      byType.update({
+        series: [{ key: "n", name: "Reports", color: "var(--s-report)" }],
+        rows: Object.entries(REPORT_TYPES).map(([k, t]) => ({ label: t.label, values: { n: recent.filter((r) => r.type === k).length } }))
+          .sort((a, b) => b.values.n - a.values.n),
+      });
+      const ack = median(recent.filter((r) => r.ackMs).map((r) => r.ackMs - r.time));
+      const res = median(recent.filter((r) => r.resolvedMs).map((r) => r.resolvedMs - r.time));
+      $("resp").innerHTML = `<dt>Acknowledge</dt><dd><b>${esc(fmtDuration(ack))}</b></dd><dt>Close</dt><dd><b>${esc(fmtDuration(res))}</b></dd>
+        <dt>Still open</dt><dd><b>${reports.filter((r) => r.open).length}</b></dd>`;
+    }
+
+    function render() {
+      renderFilters();
+      const list = filtered();
+      if (!selectedId && list.length) selectedId = list[0].id;
+      renderQueue(list);
+      renderDetail();
+      renderSide();
+      shell.setBadge("incidents", reports.filter((r) => r.status === "new").length);
+      const crit = reports.filter((r) => r.open && r.sev === "critical");
+      shell.alertBanner(crit.map((r) => ({ ref: r, title: `${r.typeInfo.label} reported at ${r.place}`, sub: `${REPORT_STATUS[r.status].label} · ${timeAgo(r.time)}` })),
+        (a) => select(a.ref.id));
+    }
+
+    watchReports(ctx, (data) => {
+      if (seen) for (const r of data) if (!seen.has(r.id)) shell.notify(`📣 New citizen report: ${r.typeInfo.label} at ${r.place}`);
+      reports = data;
+      render();
+      seen = new Set(data.map((r) => r.id));
+      shell.setLive(true);
+    }, (err) => { console.error(err); shell.setLive(false); shell.toast(`Citizen reports unavailable: ${err.code || err.message}`, "error"); });
+    setInterval(() => { renderQueue(filtered()); }, 30000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Map — FIRO Control Room</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0a100e" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/ops.css" />
+  <style>
+    body.mapfull { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    body.mapfull .topbar { position: relative; flex-shrink: 0; }
+    .map-stage { position: relative; flex: 1; min-height: 420px; }
+    .map-stage #map { position: absolute; inset: 0; background: #0d1412; }
+    .ov-left { top: 14px; left: 60px; width: 250px; padding: 14px 16px; display: grid; gap: 12px; }
+    .ov-left h3, .ov-right h3 { margin: 0; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+    .ov-right { top: 14px; right: 14px; width: 340px; max-height: calc(100% - 28px); display: flex; flex-direction: column; }
+    .ov-right .head { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .ov-right .list { overflow-y: auto; }
+    .ov-stats { bottom: 26px; left: 14px; padding: 10px 14px; display: flex; gap: 18px; }
+    .ov-stats div { display: grid; }
+    .ov-stats b { font-size: 1.4rem; line-height: 1.1; }
+    .ov-stats span { font-size: .7rem; color: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; }
+    body.kiosk .ov-left { display: none; }
+    @media (max-width: 900px) {
+      .ov-left { left: 10px; top: 10px; width: auto; right: 10px; grid-template-columns: 1fr 1fr; }
+      .ov-left .legend-box { display: none; }
+      .ov-right { position: static; width: auto; max-height: none; border-radius: 0; }
+      body.mapfull { height: auto; overflow: visible; }
+      .map-stage { height: 70vh; flex: none; }
+    }
+  </style>
+</head>
+<body class="ops mapfull">
+  <header id="topbar"></header>
+
+  <div class="map-stage">
+    <div id="map" role="application" aria-label="Live map of cameras and citizen reports"></div>
+
+    <div class="map-overlay ov-left">
+      <div>
+        <h3>Layers</h3>
+        <label class="toggle"><input type="checkbox" id="lay-cameras" checked /> Cameras</label>
+        <label class="toggle"><input type="checkbox" id="lay-reports" checked /> Citizen reports</label>
+        <label class="toggle"><input type="checkbox" id="lay-history" /> Incident history (30 days)</label>
+      </div>
+      <div>
+        <h3>Basemap</h3>
+        <div class="seg" role="group" aria-label="Basemap" style="margin-top:6px;">
+          <button class="on" data-base="dark">Dark</button><button data-base="satellite">Satellite</button>
+        </div>
+      </div>
+      <div class="legend-box">
+        <h3>Legend</h3>
+        <div class="legend" style="margin-top:8px;">
+          <div class="row"><span class="sw" style="background:var(--critical)"></span> Camera: fire detected</div>
+          <div class="row"><span class="sw" style="background:var(--s-camera)"></span> Camera: online, safe</div>
+          <div class="row"><span class="sw" style="background:var(--offline)"></span> Camera: offline</div>
+          <div class="row"><span class="sw diamond" style="background:var(--critical)"></span> Report: large fire / near homes</div>
+          <div class="row"><span class="sw diamond" style="background:var(--s-report)"></span> Report: smoke / small fire</div>
+          <div class="row"><span class="sw diamond" style="background:var(--offline)"></span> Report: closed</div>
+          <div class="row"><span class="sw" style="background:var(--fire);width:9px;height:9px;opacity:.6;border-width:1px"></span> Past incident</div>
+        </div>
+      </div>
+      <button class="btn btn-sm" id="fit"><i class="fa-solid fa-expand"></i> Fit all</button>
+    </div>
+
+    <div class="map-overlay ov-right">
+      <div class="head">
+        <h3 style="flex:1;">Open incidents</h3>
+        <span class="pill critical" id="open-count">0</span>
+      </div>
+      <ul class="feed list" id="open-list"><li class="empty">Connecting…</li></ul>
+    </div>
+
+    <div class="map-overlay ov-stats" aria-live="polite">
+      <div><b id="st-fire">–</b><span>Fires</span></div>
+      <div><b id="st-online">–</b><span>Online</span></div>
+      <div><b id="st-open">–</b><span>Open reports</span></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { esc, registerServiceWorker } from "/js/common.js";
+    import {
+      startOps, watchLogs, watchReports, cameraSummary, cameraIncidents, resolveCameraIds,
+      whatsappLink, cameraMessage, reportMessage, timeAgo, REPORT_STATUS, DAY, pct,
+    } from "/js/ops/data.js";
+    import { renderShell } from "/js/ops/shell.js";
+    import { createOpsMap } from "/js/ops/map.js";
+
+    registerServiceWorker();
+    const ctx = await startOps();
+    const shell = renderShell("map", ctx);
+    const $ = (id) => document.getElementById(id);
+
+    let logs = [], reports = [], incidents = [], cams = [];
+    let seenInc = null, seenRep = null, logsLoaded = false, reportsLoaded = false;
+
+    const opsMap = createOpsMap($("map"), {
+      handlers: {
+        onResolveCamera: async (c) => {
+          if (!c || !confirm(`Mark the fire at ${c.name} as resolved?`)) return;
+          try { await resolveCameraIds(ctx, c.activeIds); shell.toast("Marked as resolved", "success"); }
+          catch (err) { console.error(err); shell.toast("Could not update. Check your permissions.", "error"); }
+        },
+        onWhatsappCamera: (c) => {
+          const inc = incidents.find((i) => i.camera === c.name) || { camera: c.name, lat: c.lat, lon: c.lon, start: c.lastTime };
+          window.open(whatsappLink(ctx.settings.whatsappNumber, cameraMessage(inc)), "_blank");
+        },
+        onWhatsappReport: (r) => window.open(whatsappLink(ctx.settings.whatsappNumber, reportMessage(r)), "_blank"),
+      },
+    });
+
+    // Layer & basemap controls
+    const toggleLayer = (id, layer) => $(id).addEventListener("change", (e) => {
+      if (e.target.checked) layer.addTo(opsMap.map); else opsMap.map.removeLayer(layer);
+    });
+    toggleLayer("lay-cameras", opsMap.layers.cameras);
+    toggleLayer("lay-reports", opsMap.layers.reports);
+    toggleLayer("lay-history", opsMap.layers.history);
+    opsMap.map.removeLayer(opsMap.layers.history);
+    document.querySelectorAll("[data-base]").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("[data-base]").forEach((x) => x.classList.toggle("on", x === b));
+      opsMap.setBase(b.dataset.base);
+    }));
+    $("fit").addEventListener("click", () => opsMap.fitAll());
+    if (!ctx.isStaff) { $("lay-reports").disabled = true; $("lay-reports").parentElement.title = "Staff only"; }
+
+    // Open incident list
+    $("open-list").addEventListener("click", (e) => {
+      const li = e.target.closest("[data-id]");
+      if (!li) return;
+      if (li.dataset.kind === "camera") opsMap.focusCamera(li.dataset.cam); else opsMap.focusReport(li.dataset.id);
+    });
+
+    // Deep links: /map#<camera name> or /map#<report id>
+    let focused = false;
+    function focusFromHash() {
+      if (focused || !location.hash || location.hash === "#kiosk") return;
+      const key = decodeURIComponent(location.hash.slice(1));
+      focused = opsMap.focusCamera(key) || opsMap.focusReport(key);
+    }
+
+    function render() {
+      const now = Date.now();
+      cams = cameraSummary(logs, now);
+      incidents = cameraIncidents(logs);
+      const vis = ctx.isStaff ? reports : [];
+      opsMap.setCameras(cams);
+      opsMap.setReports(vis.filter((r) => r.open || now - r.time < 7 * DAY));
+      opsMap.setHistory(incidents.filter((i) => now - i.start < 30 * DAY), vis.filter((r) => now - r.time < 30 * DAY));
+      focusFromHash();
+
+      const open = [
+        ...incidents.filter((i) => i.active),
+        ...vis.filter((r) => r.open),
+      ].sort((a, b) => ((b.sev === "critical") - (a.sev === "critical")) || (b.time - a.time));
+      $("open-count").textContent = open.length;
+      $("open-list").innerHTML = open.length ? open.map((i) => i.kind === "camera"
+        ? `<li class="feed-item" tabindex="0" data-id="${esc(i.id)}" data-kind="camera" data-cam="${esc(i.camera)}">
+            <span class="sev-bar critical"></span><div class="feed-main">
+            <div class="feed-top"><span class="feed-title">${esc(i.camera)}</span><span class="feed-time">${esc(timeAgo(i.start))}</span></div>
+            <div class="feed-meta"><span class="pill critical"><i class="fa-solid fa-video"></i> Camera fire</span><span>Peak ${pct(i.peak)}</span></div></div></li>`
+        : `<li class="feed-item" tabindex="0" data-id="${esc(i.id)}" data-kind="report">
+            <span class="sev-bar ${i.sev}"></span><div class="feed-main">
+            <div class="feed-top"><span class="feed-title">${esc(i.typeInfo.label)} · ${esc(i.place)}</span><span class="feed-time">${esc(timeAgo(i.time))}</span></div>
+            <div class="feed-meta"><span class="pill ${REPORT_STATUS[i.status].pill}"><i class="fa-solid ${REPORT_STATUS[i.status].icon}"></i> ${esc(REPORT_STATUS[i.status].label)}</span>
+            ${i.lat == null ? '<span class="muted">No map location</span>' : ""}</div></div></li>`).join("")
+        : `<li class="empty"><i class="fa-solid fa-leaf"></i>No open incidents</li>`;
+
+      $("st-fire").textContent = cams.filter((c) => c.active).length;
+      $("st-online").textContent = `${cams.filter((c) => c.online).length}/${cams.length}`;
+      $("st-open").textContent = ctx.isStaff ? vis.filter((r) => r.open).length : "—";
+      if (ctx.isStaff) shell.setBadge("incidents", vis.filter((r) => r.status === "new").length);
+
+      shell.alertBanner([
+        ...incidents.filter((i) => i.active).map((i) => ({ kind: "camera", ref: i, title: `Fire detected at ${i.camera}`, sub: `Peak ${pct(i.peak)}` })),
+        ...vis.filter((r) => r.open && r.sev === "critical").map((r) => ({ kind: "report", ref: r, title: `${r.typeInfo.label} reported at ${r.place}`, sub: timeAgo(r.time) })),
+      ], (a) => a.kind === "camera" ? opsMap.focusCamera(a.ref.camera) : opsMap.focusReport(a.ref.id));
+
+      if (logsLoaded) {
+        if (seenInc) for (const i of incidents) if (!seenInc.has(i.id) && i.active) { shell.notify(`🔥 Camera fire detected: ${i.camera}`); opsMap.focusCamera(i.camera); }
+        seenInc = new Set(incidents.map((i) => i.id));
+      }
+      if (reportsLoaded) {
+        if (seenRep) for (const r of reports) if (!seenRep.has(r.id)) { shell.notify(`📣 New citizen report: ${r.typeInfo.label} at ${r.place}`); opsMap.focusReport(r.id); }
+        seenRep = new Set(reports.map((r) => r.id));
+      }
+      setTimeout(() => opsMap.map.invalidateSize(), 50);
+    }
+
+    let queued = false;
+    const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; render(); }); } };
+    watchLogs(ctx, (d, meta) => { logs = d; logsLoaded = true; shell.setLive(!meta.fromCache); schedule(); },
+      (err) => { console.error(err); shell.setLive(false); shell.toast(`Camera data unavailable: ${err.code || err.message}`, "error"); });
+    if (ctx.isStaff) watchReports(ctx, (d) => { reports = d; reportsLoaded = true; schedule(); },
+      (err) => { console.error(err); shell.toast(`Citizen reports unavailable: ${err.code || err.message}`, "error"); });
+    setInterval(render, 30000);
+  </script>
+</body>
+</html>
