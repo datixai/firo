@@ -239,7 +239,7 @@ function renderStarterUpdate() {
   const list = starterUpdates();
   $("starter-update").hidden = !list.length;
   $("starter-update-list").textContent = list.length
-    ? ` New wording for: ${list.map(({ sp }) => `"${sp.title}"`).join(", ")}. Updating replaces their text but keeps them published or hidden as they are now.`
+    ? ` New versions (with cover photos) of: ${list.map(({ sp }) => `"${sp.title}"`).join(", ")}. Updating replaces their text but keeps them published or hidden as they are now.`
     : "";
 }
 

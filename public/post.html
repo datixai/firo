@@ -63,13 +63,17 @@
       document.querySelector('meta[name="description"]').setAttribute("content", post.excerpt || post.title);
       const shareText = encodeURIComponent(`${post.title} ${location.href}`);
       el.innerHTML = `
-        ${post.cover ? `<img class="article-cover" src="${esc(post.cover)}" alt="" />` : ""}
+        ${post.cover ? `
+        <div class="article-hero">
+          <img src="${esc(post.cover)}" alt="" onerror="this.parentElement.classList.add('no-photo');this.remove()" />
+          <h1>${esc(post.title)}</h1>
+        </div>` : ""}
         <div class="blog-meta">
           <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> ${esc(formatDate(post.published_at))}</span>
           <span>· ${readingTime(post.content)} min read</span>
           ${post.author ? `<span>· ${esc(post.author)}</span>` : ""}
         </div>
-        <h1 style="font-size:clamp(1.9rem,4.4vw,2.8rem);">${esc(post.title)}</h1>
+        ${post.cover ? "" : `<h1 style="font-size:clamp(1.9rem,4.4vw,2.8rem);">${esc(post.title)}</h1>`}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;">
           ${(post.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
         </div>

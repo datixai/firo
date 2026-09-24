@@ -177,7 +177,7 @@
   <script type="module">
     import { initSite, initReveal, formatDate } from "/js/site.js";
     import { esc } from "/js/common.js";
-    import { loadPublishedPosts } from "/js/blog.js";
+    import { loadPublishedPosts, coverHtml } from "/js/blog.js";
     import { initFirebase } from "/js/firebase-init.js";
 
     initSite();
@@ -189,11 +189,9 @@
     const grid = document.getElementById("latest-posts");
     grid.innerHTML = posts.map((p) => `
       <a class="glass blog-card reveal" href="/blog/${encodeURIComponent(p.slug)}">
-        ${p.cover ? `<img class="blog-cover" src="${esc(p.cover)}" alt="" loading="lazy" />`
-                  : `<div class="blog-cover"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></div>`}
+        ${coverHtml(p, esc)}
         <div class="blog-body">
           <div class="blog-meta"><span>${esc(formatDate(p.published_at))}</span>${(p.tags || []).slice(0, 1).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>
-          <h3>${esc(p.title)}</h3>
           <p>${esc(p.excerpt)}</p>
           <span class="read-more">Read article <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
         </div>

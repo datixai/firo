@@ -964,3 +964,38 @@ h3 { font-weight: 600; }
 .team-grid .team-card h3 { font-size: 1.3rem; margin: 0 0 4px; }
 .team-grid .team-card .role { color: var(--jg-fire-bright); font-weight: 600; font-size: .95rem; margin-bottom: 14px; }
 .team-grid .team-card p { color: var(--jg-text-dim); font-size: .97rem; line-height: 1.6; margin: 0; }
+
+/* Blog covers: photo with the article title written over it */
+.blog-cover { position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: flex-start; aspect-ratio: 16 / 10; font-size: 1rem; color: #fff; }
+.blog-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .8s var(--ease-out); }
+.blog-card:hover .blog-cover img { transform: scale(1.04); }
+.blog-cover::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(2, 13, 8, 0) 30%, rgba(2, 13, 8, .35) 55%, rgba(2, 13, 8, .88) 100%);
+}
+.blog-cover:not(.has-photo)::after { background: linear-gradient(180deg, transparent 40%, rgba(2, 13, 8, .55)); }
+.blog-cover .cover-title {
+  position: relative; z-index: 1;
+  margin: 0; padding: 22px 22px 20px;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  color: #fff;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, .55);
+  text-wrap: balance;
+}
+.blog-card .blog-body { padding-top: 18px; }
+
+.article-hero { position: relative; margin: calc(-1 * clamp(24px, 5vw, 56px)) calc(-1 * clamp(24px, 5vw, 56px)) 26px; aspect-ratio: 16 / 8; overflow: hidden; border-radius: var(--radius) var(--radius) 0 0; display: flex; align-items: flex-end; }
+.article-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.article-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2, 13, 8, 0) 35%, rgba(2, 13, 8, .85) 100%); }
+.article-hero h1 {
+  position: relative; z-index: 1;
+  margin: 0; padding: clamp(20px, 4vw, 44px);
+  font-size: clamp(1.8rem, 4.4vw, 3rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.08;
+  color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, .55); text-wrap: balance;
+}
+@media (max-width: 640px) { .article-hero { aspect-ratio: 4 / 3; } }
+.article-hero.no-photo { aspect-ratio: auto; background: linear-gradient(135deg, #0b2d1d, #04160e); }

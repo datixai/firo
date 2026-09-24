@@ -63,3 +63,14 @@ export function readingTime(markdown) {
   const words = String(markdown || "").trim().split(/\s+/).length;
   return Math.max(1, Math.round(words / 200));
 }
+
+/**
+ * Card cover: the article's photo with its title written over it.
+ * Without a photo, the title sits on a forest-coloured background.
+ */
+export function coverHtml(post, esc) {
+  return `<div class="blog-cover ${post.cover ? "has-photo" : ""}">
+    ${post.cover ? `<img src="${esc(post.cover)}" alt="" loading="lazy" onerror="this.parentElement.classList.remove('has-photo');this.remove()" />` : ""}
+    <h3 class="cover-title">${esc(post.title)}</h3>
+  </div>`;
+}

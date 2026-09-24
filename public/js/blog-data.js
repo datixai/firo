@@ -14,12 +14,12 @@
 export const STARTER_POSTS = [
   {
     slug: "how-firo-detects-wildfires-at-the-edge",
-    rev: 2,
+    rev: 3,
     title: "How FIRO detects wildfires at the edge",
     excerpt: "A camera, a small computer and AI that answers in under a second: this is how FIRO spots fire without sending a single image to the cloud.",
     tags: ["Technology", "Edge AI"],
     author: "FIRO Team",
-    cover: "",
+    cover: "/assets/blog/firo-at-the-edge.jpg",
     published: true,
     published_at: Date.UTC(2026, 0, 12),
     content: `Most wildfire monitoring still depends on satellites, watchtowers and phone calls from the public. Each of these is slow in its own way: satellites pass over on fixed schedules and struggle with cloud cover, towers need people watching around the clock, and phone calls only come once a fire is already visible from a village.
@@ -50,12 +50,12 @@ Detection is only useful if someone acts on it. That is why FIRO pairs the devic
   },
   {
     slug: "wildfire-season-in-pakistan-and-ajk",
-    rev: 1,
+    rev: 2,
     title: "Wildfire season in Pakistan and AJK: what the data says",
     excerpt: "Thousands of high-confidence fire alerts, forests burning from Sherani to Margalla Hills to Neelum Valley. A look at why early warning matters.",
     tags: ["Wildfires", "Research"],
     author: "FIRO Team",
-    cover: "",
+    cover: "/assets/blog/wildfire-season.jpg",
     published: true,
     published_at: Date.UTC(2026, 0, 26),
     content: `Forest fires in Pakistan are becoming more frequent and more destructive, especially in the northern forests and in Azad Jammu & Kashmir.
@@ -88,12 +88,12 @@ FIRO is designed for exactly this gap: an **affordable, on-site** sensor that wa
   {
     slug: "choosing-the-right-ai-for-the-forest",
     replaces: "why-we-chose-mobilenetv2",
-    rev: 2,
+    rev: 3,
     title: "Choosing the right AI for the forest",
     excerpt: "The most accurate AI is not always the best one. Why FIRO chose models that are fast enough to run in real time on a low-cost device.",
     tags: ["Machine Learning", "Technology"],
     author: "FIRO Team",
-    cover: "",
+    cover: "/assets/blog/choosing-the-right-ai.jpg",
     published: true,
     published_at: Date.UTC(2026, 1, 9),
     content: `Choosing the AI for FIRO was not about finding the most accurate model on paper. It was about finding the most accurate model **that can run in real time on a small, low-cost device in the forest**.
