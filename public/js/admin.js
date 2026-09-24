@@ -420,7 +420,7 @@ const CONTENT_PAGES = [
 const KIND_LABELS = {
   title: "Heading", heading: "Title", text: "Text", item: "List item", button: "Button", label: "Label",
   number: "Number", caption: "Caption", role: "Role", initials: "Initials",
-  about: "About text", col: "Column heading", tagline: "Tagline",
+  about: "About text", col: "Column heading", tagline: "Tagline", quote: "Quote", quoteby: "Said by",
 };
 
 const content = {
@@ -544,7 +544,8 @@ function renderContentFields() {
     let g = groups.find((x) => x.section === section);
     if (!g) {
       const head = [...section.querySelectorAll("[data-edit]")].find((x) => /^H[12]$/.test(x.tagName));
-      g = { section, title: page.id === "footer" ? "Footer (every page)" : head ? plain(head.firoDefault) : `Section ${groups.length + 1}`, els: [] };
+      const title = page.id === "footer" ? "Footer (every page)" : section.dataset?.editGroup || (head ? plain(head.firoDefault) : `Section ${groups.length + 1}`);
+      g = { section, title, els: [] };
       groups.push(g);
     }
     g.els.push(el);

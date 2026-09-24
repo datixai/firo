@@ -113,6 +113,49 @@ function renderFooter() {
     </div>`;
 }
 
+/* ── Quotes that drift in while scrolling the home page ────── */
+// Real, attributed quotes only.
+const HOME_QUOTES = [
+  { text: "Forests are the lungs of our land, purifying the air and giving fresh strength to our people.", by: "Franklin D. Roosevelt" },
+  { text: "A society grows great when old men plant trees in whose shade they know they shall never sit.", by: "Greek proverb" },
+  { text: "Until you dig a hole, you plant a tree, you water it and make it survive, you haven't done a thing. You are just talking.", by: "Wangari Maathai" },
+  { text: "The creation of a thousand forests is in one acorn.", by: "Ralph Waldo Emerson" },
+  { text: "The best time to plant a tree was twenty years ago. The second best time is now.", by: "Chinese proverb" },
+];
+const QUOTE_VISIBLE_MS = 3200;
+
+function initScrollQuotes(quotes) {
+  if (!quotes.length) return;
+  const el = document.createElement("aside");
+  el.className = "quote-float";
+  el.setAttribute("aria-live", "polite");
+  el.innerHTML = `<p class="quote-float-text"></p><p class="quote-float-by"></p>`;
+  document.body.appendChild(el);
+
+  let next = 0, hideTimer = null, ticking = false;
+  const show = (q) => {
+    el.querySelector(".quote-float-text").textContent = `\u201C${q.text}\u201D`;
+    el.querySelector(".quote-float-by").textContent = q.by;
+    el.classList.add("show");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      el.classList.remove("show");
+      // If the reader has already scrolled past the next point, show that quote after a short pause
+      setTimeout(check, 1400);
+    }, QUOTE_VISIBLE_MS);
+  };
+  // One quote each time the reader passes another sixth of the page
+  const check = () => {
+    ticking = false;
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    if (scrollable <= 0 || next >= quotes.length || el.classList.contains("show")) return;
+    if (window.scrollY >= (scrollable * (next + 1)) / (quotes.length + 1)) show(quotes[next++]);
+  };
+  window.addEventListener("scroll", () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(check); }
+  }, { passive: true });
+}
+
 /** Fade elements with class "reveal" in as they scroll into view. */
 export function initReveal(root = document) {
   const items = root.querySelectorAll(".reveal:not(.visible)");
@@ -161,6 +204,7 @@ export function initSite() {
   renderFooter();
   initJungleBackground();
   initReveal();
+  if (page === "home") initScrollQuotes(HOME_QUOTES);
   // Text edited in Admin → Website content (the admin preview waits on this promise)
   window.__firoContent = loadSiteContent(page).catch((err) => console.warn("[FIRO] Site content:", err));
 }

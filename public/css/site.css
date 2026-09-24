@@ -839,3 +839,91 @@ h3 { font-weight: 600; }
 /* Motion: gentle fade-up with an ease-out curve */
 .reveal { transform: translateY(24px); transition: opacity 1s var(--ease-out), transform 1s var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .btn, .blog-card { transition: none; } }
+
+/* ============================================================
+   Quotes
+   On-page: large italic serif, no box. Home page: one drifts in
+   on the right while scrolling, then fades away.
+   ============================================================ */
+:root { --font-quote: "New York", "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
+
+.page-quote { padding: clamp(56px, 9vw, 112px) 0; text-align: center; }
+.page-quote figure { margin: 0 auto; max-width: 860px; }
+.page-quote blockquote {
+  margin: 0;
+  font-family: var(--font-quote);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.6rem, 3.8vw, 2.6rem);
+  line-height: 1.3;
+  letter-spacing: -.01em;
+  color: #f4fbf6;
+  text-wrap: balance;
+}
+.page-quote blockquote::before { content: "\201C"; }
+.page-quote blockquote::after { content: "\201D"; }
+.page-quote figcaption {
+  margin-top: 22px;
+  font-size: .95rem;
+  font-weight: 500;
+  letter-spacing: .02em;
+  color: var(--jg-text-dim);
+}
+.page-quote figcaption::before {
+  content: "";
+  display: block;
+  width: 36px; height: 2px;
+  margin: 0 auto 16px;
+  border-radius: 2px;
+  background: var(--jg-fire-bright);
+  opacity: .8;
+}
+
+.quote-float {
+  position: fixed;
+  right: clamp(20px, 4vw, 56px);
+  top: 50%;
+  z-index: 40;
+  max-width: 330px;
+  padding: 6px 20px 6px 0;
+  text-align: right;
+  border-right: 2px solid var(--jg-fire-bright);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(24px, -50%);
+  transition: opacity .9s var(--ease-out), transform .9s var(--ease-out);
+}
+/* soft frosted shade behind the words, feathered so it has no visible edge */
+.quote-float::before {
+  content: "";
+  position: absolute;
+  inset: -70px -60px -70px -90px;
+  z-index: -1;
+  background: rgba(2, 13, 8, .78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+}
+.quote-float.show { opacity: 1; transform: translate(0, -50%); }
+.quote-float-text {
+  margin: 0 0 10px;
+  font-family: var(--font-quote);
+  font-style: italic;
+  font-size: 1.28rem;
+  line-height: 1.4;
+  color: #f4fbf6;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .7);
+}
+.quote-float-by { margin: 0; font-size: .85rem; font-weight: 500; color: var(--jg-text-dim); }
+@media (max-width: 720px) {
+  .quote-float { top: auto; bottom: 0; left: 0; right: 0; max-width: none; padding: 64px 24px 30px; border-right: 0; text-align: center; transform: translateY(16px); }
+  .quote-float.show { transform: none; }
+  /* phones: a frosted shade rising from the bottom edge */
+  .quote-float::before { inset: 0; -webkit-mask-image: linear-gradient(to top, #000 70%, transparent); mask-image: linear-gradient(to top, #000 70%, transparent); }
+  .quote-float-text { font-size: 1.12rem; }
+  .quote-float-by::before { content: ""; display: block; width: 28px; height: 2px; margin: 0 auto 10px; border-radius: 2px; background: var(--jg-fire-bright); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quote-float { transition: opacity .3s linear; }
+}
