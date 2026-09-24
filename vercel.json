@@ -7,6 +7,10 @@
   "functions": {
     "api/config.py": {
       "excludeFiles": "{models,docs,scripts,secrets,public,raspberry-pi}/**"
+    },
+    "api/seo.py": {
+      "includeFiles": "public/js/{products,blog-data}.js",
+      "excludeFiles": "{models,docs,scripts,secrets,raspberry-pi}/**"
     }
   },
   "redirects": [
@@ -35,6 +39,22 @@
     {
       "source": "/blog/:slug",
       "destination": "/post"
+    },
+    {
+      "source": "/products/:slug",
+      "destination": "/product"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/seo?file=robots"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/seo?file=sitemap"
+    },
+    {
+      "source": "/llms.txt",
+      "destination": "/api/seo?file=llms"
     }
   ],
   "headers": [
@@ -83,6 +103,22 @@
         {
           "key": "X-Frame-Options",
           "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.gstatic.com https://cdn.jsdelivr.net; frame-src 'self' https://*.firebaseapp.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
         }
       ]
     }

@@ -138,6 +138,7 @@
 
     /* ── Map ── */
     const opsMap = createOpsMap($("map"), {
+      canAct: ctx.isStaff,
       handlers: {
         onResolveCamera: async (c) => {
           if (!c || !confirm(`Mark the fire at ${c.name} as resolved?`)) return;

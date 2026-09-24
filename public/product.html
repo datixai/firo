@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO | Product</title>
+  <meta name="description" content="A wildfire detection product from FIRO. Order on WhatsApp." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta property="og:type" content="product" />
+  <meta property="og:site_name" content="FIRO" />
+  <meta property="og:locale" content="en_GB" />
+  <meta property="og:description" content="A wildfire detection product from FIRO. Order on WhatsApp." />
+  <meta property="og:image" content="/assets/logo.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="products">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="section-tight">
+      <div class="container">
+        <p class="product-back"><a href="/products"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All products</a></p>
+        <div id="product"><div class="empty"><span class="spinner"></span></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, toast } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { initFirebase } from "/js/firebase-init.js";
+    import { renderMarkdown } from "/js/markdown.js";
+    import { loadProduct, categoryOf, photosOf, buyLink, productImageHtml, hideBrokenPhotos } from "/js/products.js";
+
+    initSite();
+    const el = document.getElementById("product");
+
+    // URL is /products/<slug> (or /product?slug=<slug>)
+    const fromPath = location.pathname.match(/^\/products\/([^/]+)\/?$/);
+    const slug = new URLSearchParams(location.search).get("slug") || (fromPath ? decodeURIComponent(fromPath[1]) : "");
+
+    let db = null;
+    try { ({ db } = await initFirebase()); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+    const p = await loadProduct(db, slug);
+
+    if (!p) {
+      document.title = "FIRO | Product not found";
+      el.innerHTML = `
+        <div class="glass empty">
+          <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+          <h2>Product not found</h2>
+          <p>It may have been removed or renamed.</p>
+          <a class="btn btn-leaf" href="/products">See all products</a>
+        </div>`;
+    } else {
+      const cat = categoryOf(p);
+      const photos = photosOf(p);
+      const pageUrl = `${location.origin}/products/${encodeURIComponent(p.slug)}`;
+      document.title = `FIRO | ${p.name}`;
+      const setMeta = (sel, value) => { const m = document.querySelector(sel); if (m) m.setAttribute("content", value); };
+      setMeta('meta[name="description"]', p.summary || p.name);
+      setMeta('meta[property="og:title"]', `${p.name} | FIRO`);
+      setMeta('meta[property="og:description"]', p.summary || p.name);
+      if (photos[0]?.startsWith("https://")) setMeta('meta[property="og:image"]', photos[0]);
+
+      const specs = (p.specs || []).filter((s) => s && (s.k || s.v));
+      el.innerHTML = `
+        <article class="product-detail">
+          <div class="product-gallery">
+            ${photos.length
+              ? `<div class="product-main has-photo"><img id="main-photo" src="${esc(photos[0])}" alt="${esc(p.name)}" /><i class="fa-solid ${cat.icon}" aria-hidden="true"></i></div>`
+              : productImageHtml(p, esc, "product-main")}
+            ${photos.length > 1 ? `<div class="product-thumbs" role="list">
+              ${photos.map((src, i) => `<button type="button" class="product-thumb ${i === 0 ? "active" : ""}" data-src="${esc(src)}" aria-label="Photo ${i + 1}" role="listitem"><img src="${esc(src)}" alt="" loading="lazy" /></button>`).join("")}
+            </div>` : ""}
+          </div>
+
+          <div class="product-info">
+            <span class="tag"><i class="fa-solid ${cat.icon}" aria-hidden="true"></i> ${esc(cat.label)}</span>
+            <h1>${esc(p.name)}</h1>
+            ${p.summary ? `<p class="product-summary">${esc(p.summary)}</p>` : ""}
+            ${p.price ? `<div class="product-price-lg">${esc(p.price)}</div>` : ""}
+            <div class="product-buy glass">
+              ${cat.kind === "hardware" ? `
+              <div class="field product-qty">
+                <label for="qty">Quantity</label>
+                <input class="input" id="qty" type="number" min="1" max="999" value="1" inputmode="numeric" />
+              </div>` : ""}
+              <a class="btn btn-leaf btn-lg" id="buy" target="_blank" rel="noopener">
+                <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Buy on WhatsApp
+              </a>
+              <p class="hint">Opens WhatsApp with this product's details already written. We reply with the price, delivery and payment options.</p>
+            </div>
+            <div class="product-share">
+              <button class="btn btn-sm" id="copy-link"><i class="fa-solid fa-link" aria-hidden="true"></i> Copy link</button>
+              <a class="btn btn-sm" href="https://wa.me/?text=${encodeURIComponent(`${p.name} ${pageUrl}`)}" target="_blank" rel="noopener"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i> Share</a>
+            </div>
+          </div>
+        </article>
+
+        <div class="product-more">
+          <section class="glass card prose">
+            <h2>About this product</h2>
+            ${renderMarkdown(p.description || p.summary || "")}
+          </section>
+          ${specs.length ? `
+          <aside class="glass card">
+            <h2>Specifications</h2>
+            <dl class="spec-list">
+              ${specs.map((s) => `<div><dt>${esc(s.k)}</dt><dd>${esc(s.v)}</dd></div>`).join("")}
+            </dl>
+          </aside>` : ""}
+        </div>`;
+
+      hideBrokenPhotos(el);
+      const buy = document.getElementById("buy");
+      const qty = document.getElementById("qty");
+      const updateBuy = () => {
+        const n = Math.min(999, Math.max(1, parseInt(qty?.value, 10) || 1));
+        buy.href = buyLink(p, { quantity: n, pageUrl });
+      };
+      updateBuy();
+      qty?.addEventListener("input", updateBuy);
+
+      el.querySelectorAll(".product-thumb").forEach((b) => b.addEventListener("click", () => {
+        document.getElementById("main-photo").src = b.dataset.src;
+        el.querySelectorAll(".product-thumb").forEach((x) => x.classList.toggle("active", x === b));
+      }));
+      document.getElementById("copy-link").addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(pageUrl); toast("Link copied", "success"); }
+        catch { toast("Could not copy the link", "error"); }
+      });
+
+      // Structured data for search engines and AI assistants
+      const ld = document.createElement("script");
+      ld.type = "application/ld+json";
+      ld.textContent = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: p.name,
+        description: p.summary || p.name,
+        category: cat.label,
+        sku: p.slug,
+        url: pageUrl,
+        image: photos.filter((u) => u.startsWith("https://")),
+        brand: { "@type": "Brand", name: "FIRO" },
+        additionalProperty: specs.map((s) => ({ "@type": "PropertyValue", name: s.k, value: s.v })),
+      }).replace(/</g, "\\u003c");
+      document.head.appendChild(ld);
+    }
+  </script>
+</body>
+</html>

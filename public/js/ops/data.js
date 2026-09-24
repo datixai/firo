@@ -255,6 +255,7 @@ export function median(values) {
 /** Mark every open reading of a camera incident as resolved (keeps the original reading for history). */
 export async function resolveCameraIds(ctx, ids) {
   if (!ids.length) return;
+  if (!ctx.isStaff) throw new Error("Only control-room staff can resolve fires.");
   const now = Date.now();
   const batch = writeBatch(ctx.db);
   ids.forEach((id) => batch.update(doc(ctx.db, ...fireLogsPath(ctx.config), id), { status: "resolved", resolved_ms: now }));

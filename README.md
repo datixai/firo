@@ -396,8 +396,9 @@ and move reports through the workflow; any signed-in officer can see camera data
      `vercel.json` already sets the output directory to `public`).
 3. Add these **Environment Variables** (Production, Preview and Development):
    `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`,
-   `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, and optionally `FIRO_WHATSAPP_NUMBER`
-   and `FIRO_CONTACT_EMAIL` (shown on the Contact page).
+   `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, and optionally `FIRO_WHATSAPP_NUMBER`,
+   `FIRO_CONTACT_EMAIL` and `FIRO_SITE_URL` (your site's address, e.g. `https://firo.example.com`,
+   used in `robots.txt`, `sitemap.xml` and `llms.txt`; without it the address of the request is used).
 4. **Deploy.** Open `https://<your-project>.vercel.app/api/config` to confirm the config
    loads, then visit the home page, `/login` and `/admin`.
 
@@ -417,7 +418,8 @@ and paused for visitors who prefer reduced motion.
 | Page | URL | What it does |
 |---|---|---|
 | Home | `/` | Hero, the problem, how FIRO works, features, model results, latest blog posts |
-| About | `/about` | Mission, objectives, statistics, technology, project journey, team |
+| About | `/about` | Mission, objectives, statistics, technology, project journey, team, frequently asked questions |
+| Products | `/products`, `/products/<slug>` | Cameras, AI models, software, dashboards and hardware setup, with a Software / Hardware filter. Each product page has photos, full details, specifications and **Buy on WhatsApp**, which opens WhatsApp (+92 340 8226347) with the product's details already written. Products are managed in the admin panel |
 | Blog | `/blog`, `/blog/<slug>` | Articles with topic filter and search; posts are managed in the admin panel |
 | Report a Fire | `/report` | Public form: what they see, GPS / map pin, place, details, photo, contact; optional WhatsApp forward |
 | Volunteers | `/volunteers` | Featured volunteers from AJK, Pakistan and the world; "Become a volunteer" form; optional WhatsApp group button |
@@ -449,7 +451,25 @@ original values for analytics.
 ### Admin (hidden)
 | Page | URL | What it does |
 |---|---|---|
-| Admin panel | `/admin` | Contact messages, blog, website text and control-room team (see [Admin Setup](#4-admin-setup)) |
+| Admin panel | `/admin` | Messages, donations, volunteers, **products** (add, edit, hide, delete, up to 5 photos each), blog, team, website text and control-room access (see [Admin Setup](#4-admin-setup)) |
+
+### Search engines and AI assistants
+| File | URL | What it does |
+|---|---|---|
+| robots.txt | `/robots.txt` | Welcomes search and AI crawlers (Google, Bing, GPTBot, Google-Extended for Gemini, ClaudeBot, PerplexityBot…), keeps the control room and admin out, links the sitemap |
+| Sitemap | `/sitemap.xml` | Every public page, product and blog post (built live from Firestore) |
+| llms.txt | `/llms.txt` | Plain-text summary of FIRO, its products, pages and contacts for AI assistants ([llmstxt.org](https://llmstxt.org)) |
+
+These three are served by `api/seo.py`. Every public page also has a description, Open Graph tags, a canonical link
+and schema.org data (Organization with the regions served, Product, BlogPosting and FAQPage).
+
+### Security
+- Firestore rules: only admins change website content, products and posts; only control-room staff can add or
+  resolve camera fire readings (anonymous visitors and self-registered accounts cannot); public forms are validated.
+- `vercel.json` sets HTTPS-only (HSTS), a Content Security Policy, `X-Frame-Options`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy` and `Cross-Origin-Opener-Policy`.
+- All data shown on pages is HTML-escaped; blog and product text is sanitised with DOMPurify; the CSV export
+  neutralises spreadsheet formulas.
 
 ---
 

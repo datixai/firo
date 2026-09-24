@@ -95,6 +95,15 @@
       background: rgba(79, 209, 133, .15); color: var(--jg-leaf-bright); font: 700 1.8rem var(--font-head); }
     .member-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
     details.add-uid summary { cursor: pointer; color: var(--jg-text-dim); font-size: .9rem; }
+    .product-photo-strip { display: flex; gap: 10px; flex-wrap: wrap; min-height: 10px; }
+    .product-photo-strip:empty::before { content: "No photos yet. The category icon is shown instead."; color: var(--jg-muted); font-size: .88rem; }
+    .pp { position: relative; width: 110px; height: 82px; border-radius: 10px; overflow: hidden; border: 2px solid var(--jg-border); background: #06170f; }
+    .pp.main { border-color: var(--jg-leaf-bright); }
+    .pp img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pp .pp-tag { position: absolute; left: 4px; bottom: 4px; font-size: .68rem; padding: 1px 6px; border-radius: 999px; background: rgba(2, 13, 8, .8); color: var(--jg-lime); }
+    .pp .pp-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; }
+    .pp .pp-actions button { width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(2, 13, 8, .85); color: #fff; cursor: pointer; font-size: .72rem; display: grid; place-items: center; }
+    .product-thumb-cell { width: 54px; height: 40px; border-radius: 8px; object-fit: cover; background: #06170f; vertical-align: middle; margin-right: 10px; }
   </style>
 </head>
 <body class="site">
@@ -143,6 +152,7 @@
         <button class="tab active" data-tab="messages" role="tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Messages <span class="count" id="count-messages" hidden></span></button>
         <button class="tab" data-tab="donations" role="tab"><i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i> Donations <span class="count" id="count-pledges" hidden></span></button>
         <button class="tab" data-tab="volunteers" role="tab"><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Volunteers <span class="count" id="count-applications" hidden></span></button>
+        <button class="tab" data-tab="products" role="tab"><i class="fa-solid fa-box-open" aria-hidden="true"></i> Products</button>
         <button class="tab" data-tab="blog" role="tab"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</button>
         <button class="tab" data-tab="people" role="tab"><i class="fa-solid fa-users" aria-hidden="true"></i> Our team</button>
         <button class="tab" data-tab="content" role="tab"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Website content</button>
@@ -268,6 +278,21 @@
           <table class="table">
             <thead><tr><th>Name</th><th>Region</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody id="volunteer-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Products -->
+      <section data-panel="products" hidden>
+        <div class="panel-head">
+          <h2>Products</h2>
+          <button class="btn btn-sm btn-leaf" id="new-product"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add product</button>
+        </div>
+        <p class="text-dim" style="font-size:.93rem;margin-top:-6px;">Items on the Products page. Visitors press <strong>Buy on WhatsApp</strong> and the product's details are sent to the sales WhatsApp number.</p>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="product-rows"></tbody>
           </table>
         </div>
       </section>
@@ -607,6 +632,74 @@
         <div class="item-actions" style="justify-content:flex-end;">
           <button type="button" class="btn" data-close>Cancel</button>
           <button type="submit" class="btn btn-leaf" id="save-volunteer"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Product editor -->
+  <div class="modal-backdrop" id="product-modal">
+    <div class="glass modal wide">
+      <div class="modal-head"><h3 id="product-editor-title">Add product</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="product-form">
+        <div class="form-row">
+          <div class="field">
+            <label for="prod-name">Product name <span class="req">*</span></label>
+            <input class="input" id="prod-name" maxlength="120" required />
+          </div>
+          <div class="field">
+            <label for="prod-category">Category</label>
+            <select class="select" id="prod-category"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="prod-slug">Web address</label>
+            <input class="input" id="prod-slug" maxlength="80" placeholder="made from the name" />
+            <span class="hint">The page will be /products/<span id="prod-slug-preview">…</span></span>
+          </div>
+          <div class="field">
+            <label for="prod-price">Price</label>
+            <input class="input" id="prod-price" maxlength="80" placeholder="e.g. PKR 45,000 or Price on request" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="prod-summary">Short description <span class="req">*</span></label>
+          <textarea class="textarea" id="prod-summary" maxlength="400" style="min-height:80px;" placeholder="One or two sentences shown on the product card"></textarea>
+        </div>
+        <div class="field">
+          <label for="prod-description">Full details</label>
+          <textarea class="textarea" id="prod-description" maxlength="20000" style="min-height:220px;font-family:ui-monospace,monospace;font-size:.9rem;" placeholder="Features, what is included, who it is for…"></textarea>
+          <span class="hint">Formatting: **bold**, ### Heading, - list item, [link](https://…)</span>
+        </div>
+        <div class="field">
+          <label for="prod-specs">Specifications</label>
+          <textarea class="textarea" id="prod-specs" style="min-height:110px;" placeholder="One per line, for example:&#10;Power: Solar or mains&#10;Connectivity: Wi-Fi or 4G"></textarea>
+          <span class="hint">One per line, as <strong>Name: value</strong> (up to 20).</span>
+        </div>
+        <div class="field">
+          <label>Photos (up to 5, the first one is the main photo)</label>
+          <div class="product-photo-strip" id="prod-photos"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <input class="input" id="prod-photo-url" placeholder="https://… image link" style="flex:1;min-width:200px;" />
+            <button type="button" class="btn btn-sm" id="prod-photo-add"><i class="fa-solid fa-link" aria-hidden="true"></i> Add link</button>
+            <label class="btn btn-sm" for="prod-photo-file"><i class="fa-solid fa-upload" aria-hidden="true"></i> Upload</label>
+            <input type="file" id="prod-photo-file" accept="image/*" multiple hidden />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="prod-order">Position on the page</label>
+            <input class="input" id="prod-order" type="number" min="0" max="999" step="1" />
+          </div>
+          <div class="field" style="justify-content:flex-end;">
+            <label class="choice" style="width:max-content;"><input type="checkbox" id="prod-published" /> <i class="fa-solid fa-eye" aria-hidden="true"></i> Show on the website</label>
+          </div>
+        </div>
+        <div id="product-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-product"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
         </div>
       </form>
     </div>

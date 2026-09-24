@@ -58,11 +58,14 @@ service cloud.firestore {
     match /artifacts/{projectId}/public/data/fire_logs/{logId} {
       // Dashboard, analytics and the public logs page (anonymous sign-in)
       allow read: if signedIn();
-      // The Pi normally writes with the Admin SDK (service account key),
-      // which bypasses these rules. This line covers a client-SDK Pi.
-      allow create: if signedIn();
+      // The Pi writes with the Admin SDK (service account key), which bypasses these
+      // rules. A Pi using the client SDK must sign in with an account added as staff.
+      // (Anyone can be signed in anonymously, so this must never be just signedIn().)
+      allow create: if isStaff()
+        && isText(request.resource.data.get('camera_location', ''), 200)
+        && isText(request.resource.data.get('detection_class', ''), 100);
       // "Resolve" button in the control room (keeps the original reading, adds status + time)
-      allow update: if isOfficer()
+      allow update: if isStaff()
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['detection_class', 'fire_probability', 'status', 'resolved_ms']);
       allow delete: if isAdmin();
@@ -100,12 +103,34 @@ service cloud.firestore {
     match /site_content/{page} {
       allow read: if true;
       allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed', 'profiles_managed', 'team_managed', 'starters_seen'])
+        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed', 'profiles_managed', 'team_managed', 'starters_seen', 'products_managed'])
         && request.resource.data.get('fields', {}) is map
         && request.resource.data.get('starters_seen', []) is list
         && request.resource.data.get('posts_managed', false) is bool
         && request.resource.data.get('profiles_managed', false) is bool
-        && request.resource.data.get('team_managed', false) is bool;
+        && request.resource.data.get('team_managed', false) is bool
+        && request.resource.data.get('products_managed', false) is bool;
+    }
+
+    // ── Products (admin managed, doc id = slug) ──────────────
+    match /products/{slug} {
+      allow read: if isAdmin() || resource.data.published == true;
+      allow delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && slug.matches('[a-z0-9-]{1,80}')
+        && request.resource.data.keys().hasOnly([
+             'slug', 'name', 'category', 'price', 'summary', 'description', 'specs',
+             'photo', 'gallery', 'order', 'published', 'created_ms', 'updated_ms'])
+        && request.resource.data.get('slug', slug) == slug
+        && isText(request.resource.data.name, 120) && request.resource.data.name.size() > 0
+        && request.resource.data.category in ['model', 'software', 'dashboard', 'hardware', 'config']
+        && isText(request.resource.data.get('price', ''), 80)
+        && isText(request.resource.data.get('summary', ''), 400)
+        && isText(request.resource.data.get('description', ''), 20000)
+        && request.resource.data.get('specs', []) is list && request.resource.data.get('specs', []).size() <= 20
+        && request.resource.data.get('gallery', []) is list && request.resource.data.get('gallery', []).size() <= 4
+        && request.resource.data.get('photo', '') is string
+        && request.resource.data.published is bool;
     }
 
     // ── Team (About page) ────────────────────────────────────

@@ -280,7 +280,12 @@
     // CSV export of incidents in the selected period
     $("export").addEventListener("click", () => {
       if (!data?.current) return;
-      const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      // Quote every cell; text starting with = + - @ is prefixed with ' so spreadsheets never run it as a formula
+      const q = (v) => {
+        let t = String(v ?? "");
+        if (typeof v === "string" && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+        return `"${t.replace(/"/g, '""')}"`;
+      };
       const rows = [["source", "reference", "place_or_camera", "type", "status", "started", "lat", "lon", "peak_confidence", "acknowledged_after_min", "closed_after_min"]];
       data.current.inc.forEach((i) => rows.push(["camera", i.id, i.camera, "fire detection", i.active ? "active" : "resolved",
         fmtDateTime(i.start), i.lat ?? "", i.lon ?? "", i.peak.toFixed(3), "", i.resolvedMs ? Math.round((i.resolvedMs - i.start) / MIN) : ""]));

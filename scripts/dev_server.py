@@ -5,7 +5,7 @@ Local preview server that behaves like the Vercel deployment:
 
   • serves the static site from  public/
   • clean URLs:  /login → public/login.html,  /login.html → 308 /login
-  • /blog/<slug> → public/post.html, unknown pages → public/404.html
+  • /blog/<slug> → public/post.html, /products/<slug> → public/product.html, unknown pages → public/404.html
   • GET /api/config  → same code as the Vercel function (api/config.py)
 
 No pip install needed (standard library only).
@@ -39,6 +39,10 @@ KEY_PATH   = os.environ.get("FIRO_KEY_PATH", os.path.join(ROOT_DIR, "secrets", "
 _spec = importlib.util.spec_from_file_location("firo_api_config", os.path.join(ROOT_DIR, "api", "config.py"))
 api_config = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(api_config)
+_spec = importlib.util.spec_from_file_location("firo_api_seo", os.path.join(ROOT_DIR, "api", "seo.py"))
+api_seo = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(api_seo)
+SEO_FILES = {"/robots.txt": "robots", "/sitemap.xml": "sitemap", "/llms.txt": "llms"}
 
 
 def read_dotenv(path):
@@ -101,6 +105,14 @@ class DevHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
 
+        if path in SEO_FILES:
+            status, ctype, body = api_seo.seo_response(SEO_FILES[path], {k.lower(): v for k, v in self.headers.items()}, self.env)
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if path == "/api/config":
             status, body = api_config.config_response(self.env)
             self.send_response(status)
@@ -118,9 +130,12 @@ class DevHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
-        # Rewrites from vercel.json: /blog/<slug> → public/post.html
+        # Rewrites from vercel.json: /blog/<slug> → post.html, /products/<slug> → product.html
         if re.fullmatch(r"/blog/[^/]+", path):
             self.path = "/post.html"
+            return super().do_GET()
+        if re.fullmatch(r"/products/[^/]+", path):
+            self.path = "/product.html"
             return super().do_GET()
 
         # /page → public/page.html

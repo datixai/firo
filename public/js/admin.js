@@ -23,6 +23,7 @@ import { STARTER_POSTS } from "/js/blog-data.js";
 import { STARTER_VOLUNTEERS, FIRST_STARTERS, REGIONS, initials } from "/js/volunteers.js";
 import { STARTER_TEAM, safeImage } from "/js/team.js";
 import { CATEGORIES, money, totalsByYear } from "/js/donate.js";
+import { STARTER_PRODUCTS, PRODUCT_CATEGORIES, categoryOf, safePhoto } from "/js/products.js";
 import { applyContent, docIdFor, editableElements, loadSanitizer } from "/js/content.js";
 import { onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -783,6 +784,203 @@ $("group-form").addEventListener("submit", async (e) => {
   } catch (err) { console.error(err); toast("Save failed. Check that the latest security rules are published.", "error", 8000); }
 });
 
+/* ── Products ───────────────────────────────────────────────── */
+const MAX_PRODUCT_PHOTOS = 5;
+let products = [];
+let productsChecked = false;
+onSnapshot(collection(db, COLLECTIONS.products), (snap) => {
+  products = snap.docs.map((d) => ({ ...d.data(), slug: d.id }))
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(String(b.name)));
+  renderProducts();
+  if (!productsChecked) { productsChecked = true; takeOverProducts(); }
+}, listenerError("products"));
+
+/** First visit: copy the built-in products into Firestore so they can be edited here. */
+async function takeOverProducts() {
+  try {
+    const ref = doc(db, COLLECTIONS.content, "products");
+    const snap = await getDoc(ref);
+    if (snap.exists() && snap.data().products_managed) return;
+    const batch = writeBatch(db);
+    if (!products.length) {
+      STARTER_PRODUCTS.forEach((p) => batch.set(doc(db, COLLECTIONS.products, p.slug), { ...p, created_ms: Date.now(), updated_ms: Date.now() }));
+    }
+    batch.set(ref, { products_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
+    await batch.commit();
+  } catch (err) {
+    console.error("[FIRO] Could not set up products:", err);
+  }
+}
+
+function renderProducts() {
+  $("product-rows").innerHTML = products.map((p) => {
+    const photo = safePhoto(p.photo);
+    return `
+    <tr>
+      <td>${photo ? `<img class="product-thumb-cell" src="${esc(photo)}" alt="" loading="lazy" />` : ""}<strong>${esc(p.name)}</strong><br />
+        <span class="text-muted" style="font-size:.85rem;">/products/${esc(p.slug)}</span></td>
+      <td class="text-dim">${esc(categoryOf(p).label)}</td>
+      <td class="text-dim">${esc(p.price || "")}</td>
+      <td><span class="pill pill-${p.published ? "published" : "draft"}">${p.published ? "Shown" : "Hidden"}</span></td>
+      <td style="text-align:right;white-space:nowrap;">
+        ${p.published ? `<a class="btn btn-sm" href="/products/${encodeURIComponent(p.slug)}" target="_blank" rel="noopener" title="View" aria-label="View product"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
+        <button class="btn btn-sm" data-prod-publish="${esc(p.slug)}">${p.published ? "Hide" : "Show"}</button>
+        <button class="btn btn-sm" data-prod-edit="${esc(p.slug)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn btn-sm btn-danger" data-prod-delete="${esc(p.slug)}"><i class="fa-solid fa-trash"></i> Delete</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">No products yet. Press <strong>Add product</strong>.</td></tr>`;
+}
+
+$("product-rows").addEventListener("click", async (e) => {
+  const pub = e.target.closest("[data-prod-publish]");
+  if (pub) {
+    const p = products.find((x) => x.slug === pub.dataset.prodPublish);
+    try { await updateDoc(doc(db, COLLECTIONS.products, p.slug), { published: !p.published, updated_ms: Date.now() }); }
+    catch (err) { console.error(err); toast("Update failed", "error"); }
+    return;
+  }
+  const edit = e.target.closest("[data-prod-edit]");
+  if (edit) { openProductEditor(products.find((x) => x.slug === edit.dataset.prodEdit)); return; }
+  const del = e.target.closest("[data-prod-delete]");
+  if (del) {
+    const p = products.find((x) => x.slug === del.dataset.prodDelete);
+    if (!confirm(`Delete "${p?.name || "this product"}"? This cannot be undone.`)) return;
+    try { await deleteDoc(doc(db, COLLECTIONS.products, del.dataset.prodDelete)); toast("Product deleted", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+
+let editingProduct = null;
+let productSlugTouched = false;
+let productPhotos = [];
+
+function renderProductPhotos() {
+  $("prod-photos").innerHTML = productPhotos.map((src, i) => `
+    <div class="pp ${i === 0 ? "main" : ""}">
+      <img src="${esc(src)}" alt="" />
+      ${i === 0 ? `<span class="pp-tag">Main</span>` : ""}
+      <div class="pp-actions">
+        ${i > 0 ? `<button type="button" data-pp-main="${i}" title="Make main photo" aria-label="Make main photo"><i class="fa-solid fa-star"></i></button>` : ""}
+        <button type="button" data-pp-remove="${i}" title="Remove" aria-label="Remove photo"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>`).join("");
+}
+$("prod-photos").addEventListener("click", (e) => {
+  const main = e.target.closest("[data-pp-main]");
+  const rm = e.target.closest("[data-pp-remove]");
+  if (main) { const [p] = productPhotos.splice(Number(main.dataset.ppMain), 1); productPhotos.unshift(p); }
+  else if (rm) productPhotos.splice(Number(rm.dataset.ppRemove), 1);
+  else return;
+  renderProductPhotos();
+});
+function addProductPhoto(src) {
+  if (productPhotos.length >= MAX_PRODUCT_PHOTOS) { toast(`Up to ${MAX_PRODUCT_PHOTOS} photos`, "error"); return false; }
+  productPhotos.push(src);
+  renderProductPhotos();
+  return true;
+}
+$("prod-photo-add").addEventListener("click", () => {
+  const url = $("prod-photo-url").value.trim();
+  if (!url) return;
+  if (!safePhoto(url)) { toast("The link must start with https://", "error"); return; }
+  if (addProductPhoto(url)) $("prod-photo-url").value = "";
+});
+$("prod-photo-file").addEventListener("change", async (e) => {
+  for (const file of [...e.target.files]) {
+    try { if (!addProductPhoto(await compressImage(file, { maxSize: 1200, maxBytes: 150_000 }))) break; }
+    catch (err) { toast(err.message, "error"); }
+  }
+  e.target.value = "";
+});
+
+$("prod-category").innerHTML = ["software", "hardware"].map((kind) => `
+  <optgroup label="${kind === "software" ? "Software" : "Hardware"}">
+    ${Object.entries(PRODUCT_CATEGORIES).filter(([, c]) => c.kind === kind)
+      .map(([k, c]) => `<option value="${k}">${esc(c.label)}</option>`).join("")}
+  </optgroup>`).join("");
+
+const updateSlugPreview = () => { $("prod-slug-preview").textContent = slugify($("prod-slug").value) || "…"; };
+$("prod-name").addEventListener("input", () => {
+  if (!productSlugTouched) $("prod-slug").value = slugify($("prod-name").value);
+  updateSlugPreview();
+});
+$("prod-slug").addEventListener("input", () => { productSlugTouched = true; updateSlugPreview(); });
+
+function openProductEditor(p) {
+  editingProduct = p ? p.slug : null;
+  productSlugTouched = !!p;
+  $("product-editor-title").textContent = p ? `Edit ${p.name}` : "Add product";
+  $("prod-name").value = p?.name || "";
+  $("prod-category").value = PRODUCT_CATEGORIES[p?.category] ? p.category : "hardware";
+  $("prod-slug").value = p?.slug || "";
+  $("prod-price").value = p?.price || "";
+  $("prod-summary").value = p?.summary || "";
+  $("prod-description").value = p?.description || "";
+  $("prod-specs").value = (p?.specs || []).map((s) => `${s.k}: ${s.v}`).join("\n");
+  productPhotos = p ? [p.photo, ...(p.gallery || [])].filter((x) => safePhoto(x)) : [];
+  renderProductPhotos();
+  $("prod-photo-url").value = "";
+  $("prod-order").value = p?.order ?? (products.length + 1);
+  $("prod-published").checked = p ? !!p.published : true;
+  $("product-status").innerHTML = "";
+  updateSlugPreview();
+  openModal("product-modal");
+  $("prod-name").focus();
+}
+$("new-product").addEventListener("click", () => openProductEditor(null));
+
+/** "Name: value" lines → [{ k, v }] */
+function parseSpecs(text) {
+  return text.split("\n").map((line) => {
+    const i = line.indexOf(":");
+    const k = (i < 0 ? line : line.slice(0, i)).trim().slice(0, 80);
+    const v = (i < 0 ? "" : line.slice(i + 1)).trim().slice(0, 200);
+    return { k, v };
+  }).filter((s) => s.k || s.v).slice(0, 20);
+}
+
+$("product-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fail = (msg) => { $("product-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
+  const slug = slugify($("prod-slug").value || $("prod-name").value);
+  const data = {
+    slug,
+    name: $("prod-name").value.trim(),
+    category: $("prod-category").value,
+    price: $("prod-price").value.trim(),
+    summary: $("prod-summary").value.trim(),
+    description: $("prod-description").value,
+    specs: parseSpecs($("prod-specs").value),
+    photo: productPhotos[0] || "",
+    gallery: productPhotos.slice(1),
+    order: Number($("prod-order").value) || 0,
+    published: $("prod-published").checked,
+    updated_ms: Date.now(),
+  };
+  if (!data.name || !data.summary) return fail("Please enter a product name and a short description.");
+  if (!slug) return fail("Please enter a web address (letters, numbers and dashes).");
+  const prev = products.find((x) => x.slug === editingProduct);
+  data.created_ms = prev?.created_ms || Date.now();
+
+  $("save-product").disabled = true;
+  try {
+    if (slug !== editingProduct) {
+      const existing = await getDoc(doc(db, COLLECTIONS.products, slug));
+      if (existing.exists()) return fail(`A product with the address "${slug}" already exists.`);
+    }
+    await setDoc(doc(db, COLLECTIONS.products, slug), data);
+    if (editingProduct && editingProduct !== slug) await deleteDoc(doc(db, COLLECTIONS.products, editingProduct));
+    toast("Product saved", "success");
+    $("product-modal").classList.remove("open");
+  } catch (err) {
+    console.error(err);
+    fail(err.code === "invalid-argument" ? "The product is too large. Use fewer or smaller photos." : "Save failed. Check that the latest security rules are published.");
+  } finally {
+    $("save-product").disabled = false;
+  }
+});
+
 /* ── Volunteers: featured profiles ──────────────────────────── */
 let profiles = [];
 let profilesChecked = false;
@@ -1082,6 +1280,7 @@ $("member-form").addEventListener("submit", async (e) => {
 const CONTENT_PAGES = [
   { id: "home",    label: "Home",          url: "/" },
   { id: "about",   label: "About",         url: "/about" },
+  { id: "products", label: "Products",     url: "/products" },
   { id: "volunteers", label: "Volunteers",  url: "/volunteers" },
   { id: "blog",    label: "Blog",          url: "/blog" },
   { id: "report",  label: "Report a Fire", url: "/report" },

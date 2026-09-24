@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FIRO | Blog</title>
   <meta name="description" content="An article from the FIRO wildfire detection blog." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="FIRO" />
+  <meta property="og:locale" content="en_GB" />
+  <meta property="og:title" content="FIRO | Blog" />
+  <meta property="og:description" content="An article from the FIRO wildfire detection blog." />
+  <meta property="og:image" content="/assets/logo.png" />
+  <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#04160e" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
   <link rel="manifest" href="/manifest.json" />
@@ -60,7 +68,25 @@
         </div>`;
     } else {
       document.title = `FIRO | ${post.title}`;
-      document.querySelector('meta[name="description"]').setAttribute("content", post.excerpt || post.title);
+      const setMeta = (sel, value) => { const m = document.querySelector(sel); if (m) m.setAttribute("content", value); };
+      setMeta('meta[name="description"]', post.excerpt || post.title);
+      setMeta('meta[property="og:title"]', `${post.title} | FIRO`);
+      setMeta('meta[property="og:description"]', post.excerpt || post.title);
+      setMeta('meta[property="og:type"]', "article");
+      const coverUrl = post.cover ? new URL(post.cover, location.origin).href : "";
+      if (coverUrl) setMeta('meta[property="og:image"]', coverUrl);
+      const ld = document.createElement("script");
+      ld.type = "application/ld+json";
+      ld.textContent = JSON.stringify({
+        "@context": "https://schema.org", "@type": "BlogPosting",
+        headline: post.title, description: post.excerpt || "", image: coverUrl ? [coverUrl] : undefined,
+        datePublished: post.published_at ? new Date(post.published_at).toISOString() : undefined,
+        author: { "@type": "Organization", name: post.author || "FIRO Team" },
+        publisher: { "@id": `${location.origin}/#organization` },
+        mainEntityOfPage: `${location.origin}/blog/${encodeURIComponent(post.slug)}`,
+        keywords: (post.tags || []).join(", "),
+      }).replace(/</g, "\\u003c");
+      document.head.appendChild(ld);
       const shareText = encodeURIComponent(`${post.title} ${location.href}`);
       el.innerHTML = `
         ${post.cover ? `

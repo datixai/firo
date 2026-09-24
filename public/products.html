@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO | Products</title>
+  <meta name="description" content="Wildfire detection products from FIRO: edge AI fire cameras, fire and smoke detection models, detection software, control room dashboards and hardware setup. Order on WhatsApp for Pakistan, Azad Jammu & Kashmir, Jammu & Kashmir and worldwide." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="FIRO" />
+  <meta property="og:locale" content="en_GB" />
+  <meta property="og:title" content="FIRO | Wildfire detection products" />
+  <meta property="og:description" content="Wildfire detection products from FIRO: edge AI fire cameras, fire and smoke detection models, detection software, control room dashboards and hardware setup. Order on WhatsApp for Pakistan, Azad Jammu & Kashmir, Jammu & Kashmir and worldwide." />
+  <meta property="og:image" content="/assets/logo.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="products">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span data-edit="s1-label1" class="eyebrow"><i class="fa-solid fa-box-open" aria-hidden="true"></i> Products</span>
+        <h1 data-edit="s1-title1">Technology that protects forests</h1>
+        <p data-edit="s1-text1">Fire detection cameras, AI models, software and dashboards, built in Azad Kashmir for forests everywhere. Choose what you need and order it on WhatsApp.</p>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="container">
+        <div class="product-filter reveal">
+          <div class="choice-group" id="kind-filter" role="radiogroup" aria-label="Filter products">
+            <label class="choice"><input type="radio" name="kind" value="" checked />All</label>
+            <label class="choice"><input type="radio" name="kind" value="software" /><i class="fa-solid fa-code" aria-hidden="true"></i> Software</label>
+            <label class="choice"><input type="radio" name="kind" value="hardware" /><i class="fa-solid fa-microchip" aria-hidden="true"></i> Hardware</label>
+          </div>
+        </div>
+        <div class="grid grid-3" id="products">
+          <div class="empty"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="container">
+        <div class="glass card product-help reveal">
+          <div>
+            <h2 data-edit="s3-title1">Not sure what you need?</h2>
+            <p data-edit="s3-text1" class="text-dim">Tell us about your forest, park or farm and we will suggest the right mix of cameras, software and setup.</p>
+          </div>
+          <a class="btn btn-leaf btn-lg" id="ask-link" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Ask on WhatsApp</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-quote" data-edit-group="Quote">
+      <figure class="container reveal">
+        <blockquote data-edit="quote">The best time to plant a tree was 20 years ago. The second best time is now.</blockquote>
+        <figcaption data-edit="quoteby">Proverb</figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, initReveal } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { initFirebase } from "/js/firebase-init.js";
+    import { loadProducts, categoryOf, productImageHtml, hideBrokenPhotos, SALES_WHATSAPP } from "/js/products.js";
+
+    initSite();
+    const $ = (id) => document.getElementById(id);
+    $("ask-link").href = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent("Hello FIRO, I would like advice on wildfire detection products for my area.")}`;
+
+    let db = null;
+    try { ({ db } = await initFirebase()); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+    const products = await loadProducts(db);
+    $("kind-filter").parentElement.hidden = new Set(products.map((p) => categoryOf(p).kind)).size < 2;
+
+    function render() {
+      const kind = document.querySelector('input[name="kind"]:checked')?.value || "";
+      const list = products.filter((p) => !kind || categoryOf(p).kind === kind);
+      $("products").innerHTML = list.map((p) => `
+        <a class="glass product-card reveal" href="/products/${encodeURIComponent(p.slug)}">
+          ${productImageHtml(p, esc)}
+          <div class="product-body">
+            <span class="tag">${esc(categoryOf(p).label)}</span>
+            <h2>${esc(p.name)}</h2>
+            ${p.summary ? `<p>${esc(p.summary)}</p>` : ""}
+            <div class="product-foot">
+              <span class="product-price">${esc(p.price || "")}</span>
+              <span class="read-more">View details <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+            </div>
+          </div>
+        </a>`).join("") || `<div class="empty glass" style="grid-column:1/-1;"><i class="fa-solid fa-box-open" aria-hidden="true"></i>New products are coming soon.</div>`;
+      hideBrokenPhotos($("products"));
+      initReveal($("products"));
+    }
+    $("kind-filter").addEventListener("change", render);
+    render();
+
+    // Structured data: the list of products (helps search engines and AI assistants)
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.textContent = JSON.stringify({
+      "@context": "https://schema.org", "@type": "ItemList", name: "FIRO wildfire detection products",
+      itemListElement: products.map((p, i) => ({ "@type": "ListItem", position: i + 1, url: `${location.origin}/products/${encodeURIComponent(p.slug)}`, name: p.name })),
+    }).replace(/</g, "\\u003c");
+    document.head.appendChild(ld);
+  </script>
+</body>
+</html>

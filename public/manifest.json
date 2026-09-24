@@ -1,7 +1,7 @@
 {
-  "name": "AJK Fire Monitoring",
-  "short_name": "AJK Fire",
-  "description": "Realtime wildfire monitoring dashboard for AJK Fire Monitoring Department.",
+  "name": "FIRO Wildfire Early Warning",
+  "short_name": "FIRO",
+  "description": "FIRO wildfire early warning: AI fire detection cameras and control room for Azad Jammu & Kashmir, Pakistan.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

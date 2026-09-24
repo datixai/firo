@@ -41,6 +41,7 @@ export const COLLECTIONS = {
   pledges:           "donation_pledges",        // Donate form (private)
   donations:         "donation_records",        // donations received (public totals)
   donationUses:      "donation_uses",           // how donations were used (public)
+  products:          "products",                // products for sale (admin managed, doc id = slug)
 };
 
 // ─────────────────────────────────────────────────────────────

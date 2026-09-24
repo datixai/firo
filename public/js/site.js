@@ -23,6 +23,7 @@ import { loadSiteContent } from "/js/content.js";
 export const NAV_LINKS = [
   { page: "home",    href: "/",        label: "Home" },
   { page: "about",   href: "/about",   label: "About" },
+  { page: "products", href: "/products", label: "Products" },
   { page: "blog",    href: "/blog",    label: "Blog" },
   { page: "volunteers", href: "/volunteers", label: "Volunteers" },
   { page: "report",  href: "/report",  label: "Report a Fire", cls: "nav-report" },
@@ -88,6 +89,7 @@ function renderFooter() {
           <ul>
             <li><a href="/">Home</a></li>
             <li><a href="/about">About FIRO</a></li>
+            <li><a href="/products">Products</a></li>
             <li><a href="/blog">Blog</a></li>
             <li><a href="/volunteers">Volunteers</a></li>
             <li><a href="/donate">Donate</a></li>
@@ -200,8 +202,83 @@ export function formatDate(ms) {
 }
 
 /** Build the header, footer and background. Call once per page. */
+/* ── SEO: canonical link, social tags and structured data ─────── */
+const AREAS = [
+  ["AdministrativeArea", "Azad Jammu and Kashmir"], ["AdministrativeArea", "Jammu and Kashmir"],
+  ["AdministrativeArea", "Ladakh"], ["AdministrativeArea", "Gilgit-Baltistan"],
+  ["Country", "Pakistan"], ["Country", "India"], ["Country", "United Kingdom"], ["Country", "United States"],
+  ["Country", "Canada"], ["Country", "Italy"], ["Country", "Germany"], ["Country", "Greece"],
+  ["Country", "Spain"], ["Country", "Portugal"], ["Country", "Turkey"], ["Country", "Australia"],
+];
+
+function addJsonLd(id, data) {
+  if (document.getElementById(id)) return;
+  const el = document.createElement("script");
+  el.type = "application/ld+json";
+  el.id = id;
+  el.textContent = JSON.stringify(data).replace(/</g, "\\u003c");
+  document.head.appendChild(el);
+}
+
+function setHeadTag(tag, key, keyValue, attr, value, overwrite = false) {
+  let el = document.head.querySelector(`${tag}[${key}="${keyValue}"]`);
+  if (el && !overwrite) return;
+  if (!el) { el = document.createElement(tag); el.setAttribute(key, keyValue); document.head.appendChild(el); }
+  el.setAttribute(attr, value);
+}
+
+function applySeo(page) {
+  const origin = location.origin;
+  const url = origin + (location.pathname.replace(/\/+$/, "") || "/");
+  const desc = document.querySelector('meta[name="description"]')?.content || "";
+  setHeadTag("link", "rel", "canonical", "href", url, true);
+  setHeadTag("meta", "property", "og:url", "content", url, true);
+  setHeadTag("meta", "property", "og:site_name", "content", "FIRO");
+  setHeadTag("meta", "property", "og:type", "content", "website");
+  setHeadTag("meta", "property", "og:locale", "content", "en_GB");
+  setHeadTag("meta", "property", "og:title", "content", document.title);
+  setHeadTag("meta", "property", "og:description", "content", desc);
+  setHeadTag("meta", "name", "twitter:card", "content", "summary");
+  const img = document.head.querySelector('meta[property="og:image"]');
+  if (!img) setHeadTag("meta", "property", "og:image", "content", `${origin}/assets/logo.png`);
+  else if (img.content.startsWith("/")) img.content = origin + img.content;
+
+  addJsonLd("ld-org", {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${origin}/#organization`,
+    name: "FIRO",
+    alternateName: "FIRO Wildfire Early Warning",
+    url: `${origin}/`,
+    logo: `${origin}/assets/logo.png`,
+    description: "FIRO is a wildfire early-warning system from Azad Jammu and Kashmir, Pakistan. Cameras with on-device AI detect forest fires and smoke in seconds. FIRO sells fire detection cameras, AI models, software, dashboards and hardware setup.",
+    foundingLocation: { "@type": "Place", name: "Azad Jammu and Kashmir, Pakistan" },
+    areaServed: AREAS.map(([type, name]) => ({ "@type": type, name })),
+    knowsAbout: ["Wildfire detection", "Forest fire early warning", "Edge AI", "Computer vision",
+                 "Fire and smoke detection", "Forest conservation", "Disaster management"],
+    contactPoint: { "@type": "ContactPoint", contactType: "sales", telephone: "+92-340-8226347", availableLanguage: ["English", "Urdu"] },
+    parentOrganization: { "@type": "Organization", name: "Datix AI", url: "https://datixai.com" },
+  });
+  if (page === "home") {
+    addJsonLd("ld-site", { "@context": "https://schema.org", "@type": "WebSite", name: "FIRO", url: `${origin}/`, publisher: { "@id": `${origin}/#organization` } });
+  }
+}
+
+/** FAQ structured data from the questions on the page (after any text edited in the admin panel). */
+function addFaqJsonLd() {
+  const items = [...document.querySelectorAll(".faq details")].map((d) => ({
+    q: d.querySelector("summary")?.textContent.trim(), a: d.querySelector("p")?.textContent.trim(),
+  })).filter((x) => x.q && x.a);
+  if (!items.length) return;
+  addJsonLd("ld-faq", {
+    "@context": "https://schema.org", "@type": "FAQPage",
+    mainEntity: items.map((x) => ({ "@type": "Question", name: x.q, acceptedAnswer: { "@type": "Answer", text: x.a } })),
+  });
+}
+
 export function initSite() {
   const page = document.body.dataset.page || "";
+  applySeo(page);
   renderHeader(page);
   renderFooter();
   initJungleBackground();
@@ -209,4 +286,5 @@ export function initSite() {
   if (page === "home") initScrollQuotes(HOME_QUOTES);
   // Text edited in Admin → Website content (the admin preview waits on this promise)
   window.__firoContent = loadSiteContent(page).catch((err) => console.warn("[FIRO] Site content:", err));
+  window.__firoContent.then(addFaqJsonLd);
 }

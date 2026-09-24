@@ -149,7 +149,7 @@
               <span style="display:flex;gap:6px;">
                 <a class="btn btn-sm" href="/map#${encodeURIComponent(c.name)}" title="Show on the live map"><i class="fa-solid fa-map-location-dot"></i></a>
                 <button class="btn btn-sm" data-act="wa" data-cam="${esc(c.name)}" title="Send on WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
-                ${c.active ? `<button class="btn btn-sm btn-critical" data-act="resolve" data-cam="${esc(c.name)}"><i class="fa-solid fa-check"></i> Resolve</button>` : ""}
+                ${c.active && ctx.isStaff ? `<button class="btn btn-sm btn-critical" data-act="resolve" data-cam="${esc(c.name)}"><i class="fa-solid fa-check"></i> Resolve</button>` : ""}
               </span>
             </div>
           </article>`;
