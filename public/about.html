@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>About FIRO — Fire Intelligence &amp; Response Observatory</title>
+  <title>FIRO | About</title>
   <meta name="description" content="FIRO is a low-cost, AI-powered wildfire early-warning system for the forests of Azad Jammu & Kashmir." />
   <meta name="theme-color" content="#04160e" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
@@ -148,22 +148,8 @@
           <h2 data-edit="s6-title1">The people behind FIRO</h2>
           <p data-edit="s6-text1">FIRO is developed by Datix AI with a team of data scientists and engineers from Azad Jammu &amp; Kashmir.</p>
         </div>
-        <div class="grid grid-3">
-          <article class="glass team-card reveal">
-            <div data-edit="s6-initials1" class="avatar fire">AA</div>
-            <h3 data-edit="s6-heading1">Ahmed Ali</h3>
-            <div data-edit="s6-role1" class="role">Project Lead</div>
-          </article>
-          <article class="glass team-card reveal">
-            <div data-edit="s6-initials2" class="avatar">SI</div>
-            <h3 data-edit="s6-heading2">Seher Ishtiaq</h3>
-            <div data-edit="s6-role2" class="role">Engineer</div>
-          </article>
-          <article class="glass team-card reveal">
-            <div data-edit="s6-initials3" class="avatar">NA</div>
-            <h3 data-edit="s6-heading3">Mr. Nabeel Ali</h3>
-            <div data-edit="s6-role3" class="role">Technical Advisor</div>
-          </article>
+        <div class="grid grid-3 team-grid" id="team-grid">
+          <div class="empty" style="grid-column:1/-1;"><span class="spinner"></span></div>
         </div>
       </div>
     </section>
@@ -206,8 +192,34 @@
   <footer id="site-footer"></footer>
 
   <script type="module">
-    import { initSite } from "/js/site.js";
+    import { initSite, initReveal } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { initFirebase } from "/js/firebase-init.js";
+    import { loadTeam, safeImage } from "/js/team.js";
+    import { initials } from "/js/volunteers.js";
+
     initSite();
+
+    // "The people behind FIRO": managed in Admin → Our team
+    let db = null;
+    try { ({ db } = await initFirebase()); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+    const team = await loadTeam(db);
+    const grid = document.getElementById("team-grid");
+    grid.innerHTML = team.map((m, i) => `
+      <article class="glass team-card reveal">
+        <div class="team-photo ${i === 0 ? "fire" : ""}" data-initials="${esc(initials(m.name))}">
+          ${safeImage(m.photo) ? `<img src="${esc(safeImage(m.photo))}" alt="${esc(m.name)}" loading="lazy" />` : esc(initials(m.name))}
+        </div>
+        <h3>${esc(m.name)}</h3>
+        ${m.role ? `<div class="role">${esc(m.role)}</div>` : ""}
+        ${m.bio ? `<p>${esc(m.bio)}</p>` : ""}
+      </article>`).join("") || `<div class="empty" style="grid-column:1/-1;">Team details coming soon.</div>`;
+    // If a photo link is broken, show the person's initials instead
+    grid.querySelectorAll(".team-photo img").forEach((img) => img.addEventListener("error", () => {
+      const box = img.parentElement;
+      box.textContent = box.dataset.initials;
+    }));
+    initReveal(grid);
   </script>
 </body>
 </html>

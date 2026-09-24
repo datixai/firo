@@ -24,6 +24,7 @@ export const NAV_LINKS = [
   { page: "home",    href: "/",        label: "Home" },
   { page: "about",   href: "/about",   label: "About" },
   { page: "blog",    href: "/blog",    label: "Blog" },
+  { page: "volunteers", href: "/volunteers", label: "Volunteers" },
   { page: "report",  href: "/report",  label: "Report a Fire", cls: "nav-report" },
   { page: "contact", href: "/contact", label: "Contact" },
 ];
@@ -87,6 +88,7 @@ function renderFooter() {
             <li><a href="/">Home</a></li>
             <li><a href="/about">About FIRO</a></li>
             <li><a href="/blog">Blog</a></li>
+            <li><a href="/volunteers">Volunteers</a></li>
             <li><a href="/contact">Contact</a></li>
           </ul>
         </div>

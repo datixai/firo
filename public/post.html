@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Article — FIRO</title>
+  <title>FIRO | Blog</title>
   <meta name="description" content="An article from the FIRO wildfire detection blog." />
   <meta name="theme-color" content="#04160e" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
@@ -50,7 +50,7 @@
     const el = document.getElementById("article");
 
     if (!post) {
-      document.title = "Article not found — FIRO";
+      document.title = "FIRO | Article not found";
       el.innerHTML = `
         <div class="empty">
           <i class="fa-solid fa-leaf" aria-hidden="true"></i>
@@ -59,7 +59,7 @@
           <a class="btn btn-leaf" href="/blog">Back to the blog</a>
         </div>`;
     } else {
-      document.title = `${post.title} — FIRO`;
+      document.title = `FIRO | ${post.title}`;
       document.querySelector('meta[name="description"]').setAttribute("content", post.excerpt || post.title);
       const shareText = encodeURIComponent(`${post.title} ${location.href}`);
       el.innerHTML = `

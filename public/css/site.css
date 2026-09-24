@@ -927,3 +927,40 @@ h3 { font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   .quote-float { transition: opacity .3s linear; }
 }
+
+/* ============================================================
+   Volunteers page
+   ============================================================ */
+.volunteer-filter { display: flex; justify-content: center; margin-bottom: 30px; }
+.volunteer-card { padding: 32px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.volunteer-card .avatar { margin-bottom: 10px; }
+.volunteer-photo { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
+.volunteer-card h3 { margin: 6px 0 0; font-size: 1.3rem; }
+.volunteer-card .role { color: var(--jg-text-dim); font-weight: 500; font-size: .95rem; }
+.volunteer-card p { color: var(--jg-text-dim); margin: 8px 0 0; line-height: 1.55; font-size: .97rem; }
+.volunteer-card .read-more { margin-top: auto; padding-top: 12px; }
+.join-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
+@media (max-width: 900px) { .join-grid { grid-template-columns: 1fr; } }
+.join-grid h2 { font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 700; }
+.join-list { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 12px; }
+.join-list li { position: relative; padding-left: 30px; color: var(--jg-text); }
+.join-list li::before { content: "\f00c"; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; left: 0; top: 1px; color: var(--jg-leaf-bright); }
+
+/* Team cards with photos (About page) */
+.team-grid .team-card { display: flex; flex-direction: column; align-items: center; padding: 36px 28px 32px; }
+.team-photo {
+  width: 132px; height: 132px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 700; font-size: 2.4rem;
+  color: #04160e;
+  background: linear-gradient(135deg, var(--jg-lime), var(--jg-leaf));
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, .06), 0 12px 30px rgba(0, 0, 0, .35);
+}
+.team-photo.fire { background: linear-gradient(135deg, var(--jg-ember), var(--jg-fire)); }
+.team-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.team-grid .team-card h3 { font-size: 1.3rem; margin: 0 0 4px; }
+.team-grid .team-card .role { color: var(--jg-fire-bright); font-weight: 600; font-size: .95rem; margin-bottom: 14px; }
+.team-grid .team-card p { color: var(--jg-text-dim); font-size: .97rem; line-height: 1.6; margin: 0; }

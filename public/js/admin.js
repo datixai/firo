@@ -5,8 +5,9 @@
  * "admins" collection. Firestore rules enforce the same check
  * (see firestore.rules), so hiding the page is not the only guard.
  *
- * Tabs: contact messages · blog posts · website content (text on
- * the public pages) · control-room team. Fire reports are handled
+ * Tabs: contact messages · volunteers (applications, WhatsApp group,
+ * featured profiles) · blog posts · our team (About page) · website
+ * content (text on the public pages) · staff access (control room). Fire reports are handled
  * in the control room (/incidents).
  * ─────────────────────────────────────────────────────────────
  */
@@ -18,6 +19,8 @@ import { toast, formatDate } from "/js/site.js";
 import { renderMarkdown } from "/js/markdown.js";
 import { compressImage } from "/js/image-utils.js";
 import { STARTER_POSTS } from "/js/blog-data.js";
+import { STARTER_VOLUNTEERS, REGIONS, initials } from "/js/volunteers.js";
+import { STARTER_TEAM, safeImage } from "/js/team.js";
 import { applyContent, docIdFor, editableElements, loadSanitizer } from "/js/content.js";
 import { onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -407,11 +410,371 @@ $("post-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ── Volunteers: applications ───────────────────────────────── */
+let applications = [];
+let groupLink = "";
+
+onSnapshot(query(collection(db, COLLECTIONS.applications), orderBy("created_ms", "desc"), limit(500)), (snap) => {
+  applications = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  setBadge("count-applications", applications.filter((a) => a.status === "pending").length);
+  renderApplications();
+}, listenerError("volunteer applications"));
+
+$("application-filter").addEventListener("change", renderApplications);
+
+const APP_STATUS = { pending: ["Waiting", "new"], approved: ["Approved", "resolved"], declined: ["Declined", "dismissed"] };
+
+/** Phone number for wa.me links: digits only, Pakistani 03xx numbers get the 92 country code. */
+function waNumber(phone) {
+  let d = String(phone || "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) d = `92${d.slice(1)}`;
+  return d;
+}
+const inviteText = (a) => `Assalam o Alaikum ${a.name}! Thank you for volunteering with FIRO. Your application has been approved. Join the volunteers' WhatsApp group here: ${groupLink}`;
+
+function renderApplications() {
+  const filter = $("application-filter").value;
+  const list = applications.filter((a) => !filter || a.status === filter);
+  $("application-list").innerHTML = list.map((a) => {
+    const [label, pill] = APP_STATUS[a.status] || [a.status, "draft"];
+    const mail = `mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent("FIRO volunteers")}&body=${encodeURIComponent(groupLink ? inviteText(a) : `Assalam o Alaikum ${a.name},\n\n`)}`;
+    return `
+    <article class="glass item">
+      <div class="item-top">
+        <div class="item-title">${esc(a.name)}</div>
+        <span class="pill pill-${pill}">${esc(label)}</span>
+      </div>
+      <div class="item-meta">
+        <span><i class="fa-solid fa-location-dot"></i>${esc(a.location)}</span>
+        <span><i class="fa-solid fa-at"></i><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></span>
+        <span><i class="fa-solid fa-phone"></i><a href="tel:${esc(a.phone)}">${esc(a.phone)}</a></span>
+        <span><i class="fa-regular fa-clock"></i>${esc(timeText(a.created_ms))}</span>
+        ${a.invited_ms ? `<span><i class="fa-brands fa-whatsapp"></i>Invite sent ${esc(timeText(a.invited_ms))}</span>` : ""}
+      </div>
+      <div class="item-body">${esc(a.motivation)}</div>
+      <div class="item-actions">
+        ${a.status !== "approved" ? `<button class="btn btn-sm btn-leaf" data-app-status="approved" data-app="${esc(a.id)}"><i class="fa-solid fa-check"></i> Approve</button>` : ""}
+        ${a.status === "pending" ? `<button class="btn btn-sm" data-app-status="declined" data-app="${esc(a.id)}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ""}
+        ${a.status === "approved" ? `
+          <button class="btn btn-sm btn-leaf" data-invite="${esc(a.id)}" ${groupLink ? "" : 'disabled title="Add the WhatsApp group link below first"'}><i class="fa-brands fa-whatsapp"></i> Send invite</button>
+          <a class="btn btn-sm" href="${mail}" data-mail-invite="${esc(a.id)}"><i class="fa-solid fa-envelope"></i> Email</a>` : ""}
+        <button class="btn btn-sm btn-danger" data-delete-app="${esc(a.id)}"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
+    </article>`;
+  }).join("") || `<div class="glass empty"><i class="fa-solid fa-inbox" aria-hidden="true"></i>No applications in this view.</div>`;
+}
+
+$("application-list").addEventListener("click", async (e) => {
+  const st = e.target.closest("[data-app-status]");
+  if (st) {
+    try {
+      await updateDoc(doc(db, COLLECTIONS.applications, st.dataset.app),
+        { status: st.dataset.appStatus, reviewed_ms: Date.now(), reviewed_by: user.email || user.uid });
+      toast(st.dataset.appStatus === "approved" ? "Approved. Now send the WhatsApp group invite." : "Application declined", "success");
+    } catch (err) { console.error(err); toast("Update failed", "error"); }
+    return;
+  }
+  const inv = e.target.closest("[data-invite]") || e.target.closest("[data-mail-invite]");
+  if (inv) {
+    const id = inv.dataset.invite || inv.dataset.mailInvite;
+    const a = applications.find((x) => x.id === id);
+    if (inv.dataset.invite) window.open(`https://wa.me/${waNumber(a.phone)}?text=${encodeURIComponent(inviteText(a))}`, "_blank");
+    if (groupLink) updateDoc(doc(db, COLLECTIONS.applications, id), { invited_ms: Date.now() }).catch((err) => console.error(err));
+    return;
+  }
+  const del = e.target.closest("[data-delete-app]");
+  if (del && confirm("Delete this application permanently?")) {
+    try { await deleteDoc(doc(db, COLLECTIONS.applications, del.dataset.deleteApp)); toast("Application deleted", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+
+/* ── Volunteers: WhatsApp group link ────────────────────────── */
+onSnapshot(doc(db, COLLECTIONS.volunteerSettings, "group"), (snap) => {
+  const d = snap.exists() ? snap.data() : {};
+  groupLink = d.link || "";
+  $("group-link-input").value = groupLink;
+  $("group-public").checked = !!d.public;
+  $("group-saved").textContent = d.updated_ms ? `Last changed ${timeText(d.updated_ms)}` : "";
+  renderApplications();
+}, listenerError("WhatsApp group link"));
+
+$("group-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const link = $("group-link-input").value.trim();
+  if (link && !/^https:\/\/chat\.whatsapp\.com\/\S+$/.test(link)) {
+    return toast("Paste the group's invite link. It starts with https://chat.whatsapp.com/", "error", 7000);
+  }
+  try {
+    await setDoc(doc(db, COLLECTIONS.volunteerSettings, "group"),
+      { link, public: !!link && $("group-public").checked, updated_ms: Date.now(), updated_by: user.email || user.uid });
+    toast("WhatsApp group link saved", "success");
+  } catch (err) { console.error(err); toast("Save failed. Check that the latest security rules are published.", "error", 8000); }
+});
+
+/* ── Volunteers: featured profiles ──────────────────────────── */
+let profiles = [];
+let profilesChecked = false;
+onSnapshot(collection(db, COLLECTIONS.volunteers), (snap) => {
+  profiles = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(String(b.name)));
+  renderProfiles();
+  if (!profilesChecked) { profilesChecked = true; takeOverProfiles(); }
+}, listenerError("featured volunteers"));
+
+/** First visit: copy the built-in profiles into Firestore so they can be edited here. */
+async function takeOverProfiles() {
+  try {
+    const ref = doc(db, COLLECTIONS.content, "volunteers");
+    const snap = await getDoc(ref);
+    if (snap.exists() && snap.data().profiles_managed) return;
+    const batch = writeBatch(db);
+    if (!profiles.length) {
+      STARTER_VOLUNTEERS.forEach(({ id, ...v }) => batch.set(doc(db, COLLECTIONS.volunteers, id), { ...v, created_ms: Date.now(), updated_ms: Date.now() }));
+    }
+    batch.set(ref, { profiles_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
+    await batch.commit();
+  } catch (err) {
+    console.error("[FIRO] Could not set up volunteer profiles:", err);
+  }
+}
+
+function renderProfiles() {
+  $("volunteer-rows").innerHTML = profiles.map((v) => `
+    <tr>
+      <td><strong>${esc(v.name)}</strong><br /><span class="text-muted" style="font-size:.85rem;">${esc(v.role || "")}</span></td>
+      <td class="text-dim">${esc(REGIONS[v.region] || v.region || "")}</td>
+      <td><span class="pill pill-${v.published ? "published" : "draft"}">${v.published ? "Shown" : "Hidden"}</span>
+        ${!v.story ? `<br /><span class="text-muted" style="font-size:.8rem;">Story not written yet</span>` : ""}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-sm" data-vol-publish="${esc(v.id)}">${v.published ? "Hide" : "Show"}</button>
+        <button class="btn btn-sm" data-vol-edit="${esc(v.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn btn-sm btn-danger" data-vol-delete="${esc(v.id)}"><i class="fa-solid fa-trash"></i> Delete</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="4" class="empty">No featured volunteers yet. Press <strong>Add volunteer</strong>.</td></tr>`;
+}
+
+$("volunteer-rows").addEventListener("click", async (e) => {
+  const pub = e.target.closest("[data-vol-publish]");
+  if (pub) {
+    const v = profiles.find((x) => x.id === pub.dataset.volPublish);
+    try { await updateDoc(doc(db, COLLECTIONS.volunteers, v.id), { published: !v.published, updated_ms: Date.now() }); }
+    catch (err) { console.error(err); toast("Update failed", "error"); }
+    return;
+  }
+  const edit = e.target.closest("[data-vol-edit]");
+  if (edit) { openVolunteerEditor(profiles.find((x) => x.id === edit.dataset.volEdit)); return; }
+  const del = e.target.closest("[data-vol-delete]");
+  if (del) {
+    const v = profiles.find((x) => x.id === del.dataset.volDelete);
+    if (!confirm(`Remove ${v?.name || "this volunteer"} from the website?`)) return;
+    try { await deleteDoc(doc(db, COLLECTIONS.volunteers, del.dataset.volDelete)); toast("Removed", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+
+let editingVolunteer = null;
+let volunteerPhoto = "";
+function setVolunteerPhoto(src) {
+  volunteerPhoto = src || "";
+  $("vol-photo-preview").src = volunteerPhoto;
+  $("vol-photo-preview").hidden = !volunteerPhoto;
+}
+function openVolunteerEditor(v) {
+  editingVolunteer = v ? v.id : null;
+  $("volunteer-editor-title").textContent = v ? `Edit ${v.name}` : "Add volunteer";
+  $("vol-name").value = v?.name || "";
+  $("vol-region").value = v?.region || "ajk";
+  $("vol-role").value = v?.role || "";
+  $("vol-story").value = v?.story || "";
+  $("vol-link").value = v?.link || "";
+  $("vol-order").value = v?.order ?? (profiles.length + 1);
+  $("vol-photo-url").value = v?.photo && !v.photo.startsWith("data:") ? v.photo : "";
+  setVolunteerPhoto(v?.photo || "");
+  $("vol-published").checked = v ? !!v.published : true;
+  $("volunteer-status").innerHTML = "";
+  openModal("volunteer-modal");
+  $("vol-name").focus();
+}
+$("new-volunteer").addEventListener("click", () => openVolunteerEditor(null));
+$("vol-photo-url").addEventListener("change", () => setVolunteerPhoto($("vol-photo-url").value.trim()));
+$("vol-photo-clear").addEventListener("click", () => { $("vol-photo-url").value = ""; setVolunteerPhoto(""); });
+$("vol-photo-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try { setVolunteerPhoto(await compressImage(file, { maxSize: 480, maxBytes: 150_000 })); $("vol-photo-url").value = ""; }
+  catch (err) { toast(err.message, "error"); }
+  e.target.value = "";
+});
+
+$("volunteer-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("vol-name").value.trim();
+  const link = $("vol-link").value.trim();
+  const fail = (msg) => { $("volunteer-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
+  if (!name) return fail("Please enter a name.");
+  if (link && !/^https?:\/\//i.test(link)) return fail("The link must start with https://");
+  const data = {
+    name,
+    region: $("vol-region").value,
+    role: $("vol-role").value.trim(),
+    story: $("vol-story").value.trim(),
+    link,
+    photo: volunteerPhoto,
+    order: Number($("vol-order").value) || 0,
+    published: $("vol-published").checked,
+    updated_ms: Date.now(),
+  };
+  $("save-volunteer").disabled = true;
+  try {
+    if (editingVolunteer) await updateDoc(doc(db, COLLECTIONS.volunteers, editingVolunteer), data);
+    else {
+      const id = slugify(name) || `volunteer-${Date.now()}`;
+      const exists = (await getDoc(doc(db, COLLECTIONS.volunteers, id))).exists();
+      await setDoc(doc(db, COLLECTIONS.volunteers, exists ? `${id}-${Date.now().toString(36)}` : id), { ...data, created_ms: Date.now() });
+    }
+    toast("Saved", "success");
+    $("volunteer-modal").classList.remove("open");
+  } catch (err) {
+    console.error(err);
+    fail(err.code === "invalid-argument" ? "The photo is too large. Try a smaller one." : "Save failed. Check that the latest security rules are published.");
+  } finally {
+    $("save-volunteer").disabled = false;
+  }
+});
+
+/* ── Our team (About page) ──────────────────────────────────── */
+let members = [];
+let membersChecked = false;
+onSnapshot(collection(db, COLLECTIONS.team), (snap) => {
+  members = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(String(b.name)));
+  renderMembers();
+  if (!membersChecked) { membersChecked = true; takeOverTeam(); }
+}, listenerError("team members"));
+
+/** First visit: copy the built-in team into Firestore so it can be edited here. */
+async function takeOverTeam() {
+  try {
+    const ref = doc(db, COLLECTIONS.content, "about");
+    const snap = await getDoc(ref);
+    if (snap.exists() && snap.data().team_managed) return;
+    const batch = writeBatch(db);
+    if (!members.length) {
+      STARTER_TEAM.forEach(({ id, ...m }) => batch.set(doc(db, COLLECTIONS.team, id), { ...m, created_ms: Date.now(), updated_ms: Date.now() }));
+    }
+    batch.set(ref, { team_managed: true, updated_ms: Date.now(), updated_by: user.email || user.uid }, { merge: true });
+    await batch.commit();
+  } catch (err) {
+    console.error("[FIRO] Could not set up the team list:", err);
+  }
+}
+
+const photoHtml = (url, name) => (safeImage(url) ? `<img src="${esc(safeImage(url))}" alt="" />` : esc(initials(name)));
+
+function renderMembers() {
+  $("member-rows").innerHTML = members.map((m) => `
+    <tr>
+      <td><div style="display:flex;gap:12px;align-items:center;">
+        <span class="member-thumb">${photoHtml(m.photo, m.name)}</span>
+        <div><strong>${esc(m.name)}</strong><br /><span class="text-muted" style="font-size:.85rem;">${esc(m.role || "")}</span></div>
+      </div></td>
+      <td><span class="pill pill-${m.published ? "published" : "draft"}">${m.published ? "Shown" : "Hidden"}</span></td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-sm" data-member-publish="${esc(m.id)}">${m.published ? "Hide" : "Show"}</button>
+        <button class="btn btn-sm" data-member-edit="${esc(m.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn btn-sm btn-danger" data-member-delete="${esc(m.id)}"><i class="fa-solid fa-trash"></i> Delete</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="3" class="empty">No team members yet. Press <strong>Add member</strong>.</td></tr>`;
+}
+
+$("member-rows").addEventListener("click", async (e) => {
+  const pub = e.target.closest("[data-member-publish]");
+  if (pub) {
+    const m = members.find((x) => x.id === pub.dataset.memberPublish);
+    try { await updateDoc(doc(db, COLLECTIONS.team, m.id), { published: !m.published, updated_ms: Date.now() }); }
+    catch (err) { console.error(err); toast("Update failed", "error"); }
+    return;
+  }
+  const edit = e.target.closest("[data-member-edit]");
+  if (edit) { openMemberEditor(members.find((x) => x.id === edit.dataset.memberEdit)); return; }
+  const del = e.target.closest("[data-member-delete]");
+  if (del) {
+    const m = members.find((x) => x.id === del.dataset.memberDelete);
+    if (!confirm(`Remove ${m?.name || "this member"} from the About page?`)) return;
+    try { await deleteDoc(doc(db, COLLECTIONS.team, del.dataset.memberDelete)); toast("Removed", "success"); }
+    catch (err) { console.error(err); toast("Delete failed", "error"); }
+  }
+});
+
+let editingMember = null;
+function updateMemberPreview() {
+  const box = $("member-photo-preview");
+  box.innerHTML = photoHtml($("member-photo").value.trim(), $("member-name").value || "?");
+  box.querySelector("img")?.addEventListener("error", () => {
+    box.textContent = initials($("member-name").value || "?");
+    $("member-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>That photo link doesn't load. Use a direct image link (for GitHub, the "raw.githubusercontent.com" address).</div></div>`;
+  });
+}
+function openMemberEditor(m) {
+  editingMember = m ? m.id : null;
+  $("member-editor-title").textContent = m ? `Edit ${m.name}` : "Add member";
+  $("member-name").value = m?.name || "";
+  $("member-role").value = m?.role || "";
+  $("member-photo").value = m?.photo || "";
+  $("member-bio").value = m?.bio || "";
+  $("member-order").value = m?.order ?? (members.length + 1);
+  $("member-published").checked = m ? !!m.published : true;
+  $("member-status").innerHTML = "";
+  updateMemberPreview();
+  openModal("member-modal");
+  $("member-name").focus();
+}
+$("new-member").addEventListener("click", () => openMemberEditor(null));
+$("member-photo").addEventListener("input", () => { $("member-status").innerHTML = ""; updateMemberPreview(); });
+$("member-name").addEventListener("input", () => { if (!safeImage($("member-photo").value.trim())) updateMemberPreview(); });
+
+$("member-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("member-name").value.trim();
+  const photo = $("member-photo").value.trim();
+  const fail = (msg) => { $("member-status").innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>${esc(msg)}</div></div>`; };
+  if (!name) return fail("Please enter a name.");
+  if (photo && !safeImage(photo)) return fail("The photo link must start with https:// (and have no spaces).");
+  const data = {
+    name,
+    role: $("member-role").value.trim(),
+    photo,
+    bio: $("member-bio").value.trim(),
+    order: Number($("member-order").value) || 0,
+    published: $("member-published").checked,
+    updated_ms: Date.now(),
+  };
+  $("save-member").disabled = true;
+  try {
+    if (editingMember) await updateDoc(doc(db, COLLECTIONS.team, editingMember), data);
+    else {
+      const id = slugify(name) || `member-${Date.now()}`;
+      const exists = (await getDoc(doc(db, COLLECTIONS.team, id))).exists();
+      await setDoc(doc(db, COLLECTIONS.team, exists ? `${id}-${Date.now().toString(36)}` : id), { ...data, created_ms: Date.now() });
+    }
+    toast("Saved", "success");
+    $("member-modal").classList.remove("open");
+  } catch (err) {
+    console.error(err);
+    fail("Save failed. Check that the latest security rules are published.");
+  } finally {
+    $("save-member").disabled = false;
+  }
+});
+
 /* ── Website content ────────────────────────────────────────── */
 // Each page's text lives in site_content/{id}; the footer is shared by every page.
 const CONTENT_PAGES = [
   { id: "home",    label: "Home",          url: "/" },
   { id: "about",   label: "About",         url: "/about" },
+  { id: "volunteers", label: "Volunteers",  url: "/volunteers" },
   { id: "blog",    label: "Blog",          url: "/blog" },
   { id: "report",  label: "Report a Fire", url: "/report" },
   { id: "contact", label: "Contact",       url: "/contact" },

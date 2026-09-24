@@ -34,6 +34,10 @@ export const COLLECTIONS = {
   staff:    "staff",             // doc id = control-room operator's UID
   requests: "access_requests",   // control-room access requests, doc id = requester's UID
   content:  "site_content",      // website text edited in the admin panel, doc id = page
+  volunteers:        "volunteers",              // featured volunteer profiles (admin managed)
+  applications:      "volunteer_applications",  // "Become a volunteer" form
+  volunteerSettings: "volunteer_settings",      // doc "group": volunteers' WhatsApp group link
+  team:              "team_members",            // "The people behind FIRO" on /about (admin managed)
 };
 
 // ─────────────────────────────────────────────────────────────

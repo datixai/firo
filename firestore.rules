@@ -16,6 +16,10 @@ rules_version = '2';
 //   staff             control-room operators, id = user UID (managed by admins in /admin → Team)
 //   access_requests   "Request access" from the control room, id = user UID (admins approve in Team)
 //   site_content      website text edited in /admin → Website content, id = page
+//   volunteers        featured volunteer profiles on /volunteers (admins manage)
+//   volunteer_applications  "Become a volunteer" form (anyone creates, admins manage)
+//   volunteer_settings      doc "group": volunteers' WhatsApp group link (admins manage)
+//   team_members      "The people behind FIRO" on /about (admins manage)
 // ─────────────────────────────────────────────────────────────
 
 service cloud.firestore {
@@ -93,9 +97,53 @@ service cloud.firestore {
     match /site_content/{page} {
       allow read: if true;
       allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed'])
+        && request.resource.data.keys().hasOnly(['fields', 'updated_ms', 'updated_by', 'posts_managed', 'profiles_managed', 'team_managed'])
         && request.resource.data.get('fields', {}) is map
-        && request.resource.data.get('posts_managed', false) is bool;
+        && request.resource.data.get('posts_managed', false) is bool
+        && request.resource.data.get('profiles_managed', false) is bool
+        && request.resource.data.get('team_managed', false) is bool;
+    }
+
+    // ── Team (About page) ────────────────────────────────────
+    match /team_members/{id} {
+      allow read: if isAdmin() || resource.data.published == true;
+      allow delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && isText(request.resource.data.get('photo', ''), 500)
+        && (request.resource.data.get('photo', '') == '' || request.resource.data.photo.matches('https://.+'));
+    }
+
+    // ── Volunteers ───────────────────────────────────────────
+    match /volunteers/{id} {
+      allow read: if isAdmin() || resource.data.published == true;
+      allow write: if isAdmin();
+    }
+
+    match /volunteer_applications/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'name', 'location', 'motivation', 'email', 'phone', 'status', 'created_at', 'created_ms'])
+        && request.resource.data.keys().hasAll([
+             'name', 'location', 'motivation', 'email', 'phone', 'status', 'created_at', 'created_ms'])
+        && isText(request.resource.data.name, 100) && request.resource.data.name.size() > 0
+        && isText(request.resource.data.location, 150) && request.resource.data.location.size() > 0
+        && isText(request.resource.data.motivation, 2000) && request.resource.data.motivation.size() > 0
+        && isText(request.resource.data.email, 200) && request.resource.data.email.size() > 0
+        && isText(request.resource.data.phone, 30) && request.resource.data.phone.size() > 0
+        && request.resource.data.status == 'pending'
+        && request.resource.data.created_at == request.time
+        && request.resource.data.created_ms is int;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Anyone may read the group link only when the admin has made it public
+    match /volunteer_settings/{id} {
+      allow read: if isAdmin() || resource.data.public == true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['link', 'public', 'updated_ms', 'updated_by'])
+        && isText(request.resource.data.link, 300)
+        && (request.resource.data.link == '' || request.resource.data.link.matches('https://chat[.]whatsapp[.]com/.+'))
+        && request.resource.data.public is bool;
     }
 
     // ── Public fire reports ──────────────────────────────────

@@ -163,6 +163,7 @@ FIRO-FYP/
 │   ├── blog.html                    # Blog list                                   → /blog
 │   ├── post.html                    # Single article                              → /blog/<slug>
 │   ├── report.html                  # Public "Report a Fire" form                 → /report
+│   ├── volunteers.html              # Featured volunteers + "Become a volunteer"  → /volunteers
 │   ├── contact.html                 # Contact form                                → /contact
 │   ├── admin.html                   # Hidden admin panel (not linked anywhere)    → /admin
 │   ├── 404.html                     # "Lost in the jungle" page
@@ -182,6 +183,8 @@ FIRO-FYP/
 │   │   ├── common.js                # Shared helpers (escaping, fire status, coords, theme)
 │   │   ├── admin.js                 # Admin panel logic
 │   │   ├── content.js               # Website text edited in the admin panel
+│   │   ├── volunteers.js            # Volunteers page data (built-in profiles, group link)
+│   │   ├── team.js                  # About page team (built-in members)
 │   │   ├── ops/data.js              # Control room: live data, incidents, workflow actions
 │   │   ├── ops/shell.js             # Control room: top bar, kiosk, sound alerts, pop-out
 │   │   ├── ops/charts.js            # Control room: SVG charts with table views
@@ -361,16 +364,21 @@ page itself just tells other people to contact the administrator.
    Collection ID `admins` → Document ID = *the UID* → add a field `email` (string) → **Save**.
 4. Open `/admin`. The profile icon (top right) opens **Website**, **Dashboard** and **Log out**. Tabs:
    - **Messages:** read, reply by email, mark read/unread, delete
+   - **Volunteers:** approve or decline applications from the Volunteers page, send approved volunteers the
+     WhatsApp group invite with one tap, update the group link (optionally show it publicly), and add, edit,
+     show/hide or delete the featured volunteer cards (Azad Jammu & Kashmir, Pakistan, World)
    - **Blog:** add, edit, publish/unpublish and delete articles (Markdown with live preview, cover images, drafts).
      The first time the panel opens, the three built-in articles are copied here so they can be edited or deleted too.
    - **Website content:** change the text on the Home, About, Blog, Report a Fire and Contact pages and the footer,
      with a live preview. Only changed text is saved (`site_content` collection); **Reset** restores the original.
-   - **Team:** approve or decline control-room access requests, remove staff, or add someone by user ID
+   - **Our team:** the people shown on the About page: name, role, bio, photo (paste an https image link, e.g. from
+     the GitHub assets repository), order, show/hide
+   - **Staff access:** approve or decline control-room access requests, remove staff, or add someone by user ID
 
 Fire reports are handled in the control room (`/incidents`), not in the admin panel.
 
 **Control-room staff.** Operators who handle citizen reports don't need to be admins. They create an account,
-open the dashboard and press **Request access**; approve them in **/admin → Team**. Staff can see reporter details
+open the dashboard and press **Request access**; approve them in **/admin → Staff access**. Staff can see reporter details
 and move reports through the workflow; any signed-in officer can see camera data.
 
 ---
@@ -407,6 +415,7 @@ and paused for visitors who prefer reduced motion.
 | About | `/about` | Mission, objectives, statistics, technology, project journey, team |
 | Blog | `/blog`, `/blog/<slug>` | Articles with topic filter and search; posts are managed in the admin panel |
 | Report a Fire | `/report` | Public form: what they see, GPS / map pin, place, details, photo, contact; optional WhatsApp forward |
+| Volunteers | `/volunteers` | Featured volunteers from AJK, Pakistan and the world; "Become a volunteer" form; optional WhatsApp group button |
 | Contact | `/contact` | Contact form (saved for admins) plus WhatsApp / email / university details |
 
 ### Control room (opened from the profile icon in the nav bar)

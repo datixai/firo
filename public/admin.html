@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FIRO Admin</title>
+  <title>FIRO | Admin</title>
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#04160e" />
   <link rel="icon" type="image/png" href="/assets/logo.png" />
@@ -88,6 +88,12 @@
     .frame-box .frame-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--jg-text-dim); }
     .content-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     #content-status { font-size: .88rem; }
+    .member-thumb { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: grid; place-items: center;
+      background: rgba(79, 209, 133, .18); color: var(--jg-leaf-bright); font-weight: 700; font-size: .85rem; overflow: hidden; }
+    .member-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .member-photo-preview { width: 112px; height: 112px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; flex-shrink: 0;
+      background: rgba(79, 209, 133, .15); color: var(--jg-leaf-bright); font: 700 1.8rem var(--font-head); }
+    .member-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
     details.add-uid summary { cursor: pointer; color: var(--jg-text-dim); font-size: .9rem; }
   </style>
 </head>
@@ -135,9 +141,11 @@
     <div id="state-admin" hidden>
       <div class="tabs" role="tablist">
         <button class="tab active" data-tab="messages" role="tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Messages <span class="count" id="count-messages" hidden></span></button>
+        <button class="tab" data-tab="volunteers" role="tab"><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Volunteers <span class="count" id="count-applications" hidden></span></button>
         <button class="tab" data-tab="blog" role="tab"><i class="fa-solid fa-newspaper" aria-hidden="true"></i> Blog</button>
+        <button class="tab" data-tab="people" role="tab"><i class="fa-solid fa-users" aria-hidden="true"></i> Our team</button>
         <button class="tab" data-tab="content" role="tab"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Website content</button>
-        <button class="tab" data-tab="team" role="tab"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> Team <span class="count" id="count-requests" hidden></span></button>
+        <button class="tab" data-tab="team" role="tab"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> Staff access <span class="count" id="count-requests" hidden></span></button>
       </div>
 
       <!-- Messages -->
@@ -172,6 +180,62 @@
           <table class="table">
             <thead><tr><th>Title</th><th>Status</th><th>Date</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody id="post-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Volunteers -->
+      <section data-panel="volunteers" hidden>
+        <div class="panel-head">
+          <h2>Volunteer applications</h2>
+          <select class="select select-sm" id="application-filter" aria-label="Filter applications">
+            <option value="pending">Waiting for review</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+            <option value="">All</option>
+          </select>
+        </div>
+        <div id="application-list"></div>
+
+        <div class="glass card" style="margin:26px 0;">
+          <h3 style="margin-top:0;"><i class="fa-brands fa-whatsapp text-leaf" aria-hidden="true"></i> Volunteers' WhatsApp group</h3>
+          <p class="text-dim" style="font-size:.93rem;">Approved volunteers receive this link when you press <strong>Send invite</strong>. Paste the new link here whenever it changes.</p>
+          <form class="form" id="group-form">
+            <div class="field">
+              <label for="group-link-input">Group invite link</label>
+              <input class="input" id="group-link-input" maxlength="300" placeholder="https://chat.whatsapp.com/…" />
+            </div>
+            <label class="choice" style="width:max-content;max-width:100%;white-space:normal;"><input type="checkbox" id="group-public" />
+              <i class="fa-solid fa-globe" aria-hidden="true"></i> Also show a "Join our WhatsApp group" button on the Volunteers page (anyone can join)</label>
+            <div class="item-actions"><button class="btn btn-sm btn-leaf" type="submit"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save link</button>
+              <span class="text-muted" id="group-saved" style="font-size:.85rem;"></span></div>
+          </form>
+        </div>
+
+        <div class="panel-head">
+          <h2>Featured volunteers</h2>
+          <button class="btn btn-sm btn-leaf" id="new-volunteer"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add volunteer</button>
+        </div>
+        <p class="text-dim" style="font-size:.93rem;margin-top:-6px;">People shown as cards on the Volunteers page, from Azad Jammu &amp; Kashmir, Pakistan and around the world.</p>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Name</th><th>Region</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="volunteer-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Our team (About page) -->
+      <section data-panel="people" hidden>
+        <div class="panel-head">
+          <h2>Our team</h2>
+          <button class="btn btn-sm btn-leaf" id="new-member"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Add member</button>
+        </div>
+        <p class="text-dim" style="font-size:.93rem;margin-top:-6px;">The people shown in "The people behind FIRO" on the About page. For photos, paste an image link, for example from your GitHub assets repository.</p>
+        <div class="glass table-wrap">
+          <table class="table">
+            <thead><tr><th>Member</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="member-rows"></tbody>
           </table>
         </div>
       </section>
@@ -321,6 +385,106 @@
         <div class="item-actions" style="justify-content:flex-end;">
           <button type="button" class="btn" data-close>Cancel</button>
           <button type="submit" class="btn btn-leaf" id="save-post"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save post</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Team member editor -->
+  <div class="modal-backdrop" id="member-modal">
+    <div class="glass modal">
+      <div class="modal-head"><h3 id="member-editor-title">Add member</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="member-form">
+        <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+          <div class="member-photo-preview" id="member-photo-preview"></div>
+          <div style="flex:1;min-width:240px;display:grid;gap:14px;">
+            <div class="field">
+              <label for="member-name">Name <span class="req">*</span></label>
+              <input class="input" id="member-name" maxlength="100" required />
+            </div>
+            <div class="field">
+              <label for="member-role">Role</label>
+              <input class="input" id="member-role" maxlength="100" placeholder="e.g. Founder &amp; CEO" />
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="member-photo">Photo link</label>
+          <input class="input" id="member-photo" maxlength="500" placeholder="https://raw.githubusercontent.com/…/photo.jpg" />
+          <span class="hint">Paste a direct image link starting with https://. Leave empty to show the person's initials.</span>
+        </div>
+        <div class="field">
+          <label for="member-bio">About</label>
+          <textarea class="textarea" id="member-bio" maxlength="800"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="member-order">Position on the page</label>
+            <input class="input" id="member-order" type="number" min="0" max="999" step="1" />
+          </div>
+          <div class="field" style="justify-content:flex-end;">
+            <label class="choice" style="width:max-content;"><input type="checkbox" id="member-published" /> <i class="fa-solid fa-eye" aria-hidden="true"></i> Show on the website</label>
+          </div>
+        </div>
+        <div id="member-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-member"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Featured volunteer editor -->
+  <div class="modal-backdrop" id="volunteer-modal">
+    <div class="glass modal">
+      <div class="modal-head"><h3 id="volunteer-editor-title">Add volunteer</h3><button class="btn btn-sm" data-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <form class="form" id="volunteer-form">
+        <div class="form-row">
+          <div class="field">
+            <label for="vol-name">Name <span class="req">*</span></label>
+            <input class="input" id="vol-name" maxlength="100" required />
+          </div>
+          <div class="field">
+            <label for="vol-region">Region</label>
+            <select class="select" id="vol-region">
+              <option value="ajk">Azad Jammu &amp; Kashmir</option>
+              <option value="pakistan">Pakistan</option>
+              <option value="world">World</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="vol-role">Role or known for</label>
+          <input class="input" id="vol-role" maxlength="120" placeholder="e.g. Teacher and forest volunteer" />
+        </div>
+        <div class="field">
+          <label for="vol-story">Story</label>
+          <textarea class="textarea" id="vol-story" maxlength="1200" placeholder="What they did for forests and the environment"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="vol-photo-url">Photo</label>
+            <input class="input" id="vol-photo-url" placeholder="https://… or upload a file" />
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <label class="btn btn-sm" for="vol-photo-file"><i class="fa-solid fa-upload" aria-hidden="true"></i> Upload</label>
+              <button type="button" class="btn btn-sm" id="vol-photo-clear">Remove</button>
+            </div>
+            <input type="file" id="vol-photo-file" accept="image/*" hidden />
+            <img class="cover-preview" id="vol-photo-preview" alt="" hidden style="width:90px;height:90px;border-radius:50%;object-fit:cover;" />
+          </div>
+          <div class="field">
+            <label for="vol-link">Link (optional)</label>
+            <input class="input" id="vol-link" maxlength="300" placeholder="https://…" />
+            <label for="vol-order" style="margin-top:10px;">Position on the page</label>
+            <input class="input" id="vol-order" type="number" min="0" max="999" step="1" />
+          </div>
+        </div>
+        <label class="choice" style="width:max-content;"><input type="checkbox" id="vol-published" /> <i class="fa-solid fa-eye" aria-hidden="true"></i> Show on the website</label>
+        <div id="volunteer-status"></div>
+        <div class="item-actions" style="justify-content:flex-end;">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-leaf" id="save-volunteer"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save</button>
         </div>
       </form>
     </div>

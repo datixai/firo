@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FIRO | Volunteers</title>
+  <meta name="description" content="Meet people who protect forests in Azad Jammu & Kashmir, Pakistan and around the world, and join FIRO as a volunteer." />
+  <meta name="theme-color" content="#04160e" />
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="site" data-page="volunteers">
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="container reveal">
+        <span data-edit="s1-label1" class="eyebrow"><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Volunteers</span>
+        <h1 data-edit="s1-title1">People who protect forests</h1>
+        <p data-edit="s1-text1">Forests survive because people care for them. Meet some of those people, and join them.</p>
+      </div>
+    </section>
+
+    <!-- Featured volunteers -->
+    <section class="section-tight">
+      <div class="container">
+        <div class="volunteer-filter reveal">
+          <div class="choice-group" id="region-filter" role="radiogroup" aria-label="Filter by region"></div>
+        </div>
+        <div class="grid grid-3" id="volunteers">
+          <div class="empty"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Become a volunteer -->
+    <section class="section" id="join">
+      <div class="container join-grid">
+        <div class="reveal">
+          <span data-edit="s3-label1" class="eyebrow fire">Become a volunteer</span>
+          <h2 data-edit="s3-title1">Give the forest a few hours</h2>
+          <p data-edit="s3-text1" class="text-dim">Volunteers are the eyes and hands of FIRO on the ground. Tell us a little about yourself and the team will get in touch.</p>
+          <ul class="join-list">
+            <li data-edit="s3-item1">Report smoke and fires quickly in your area</li>
+            <li data-edit="s3-item2">Help with tree planting and forest clean-up drives</li>
+            <li data-edit="s3-item3">Spread fire-safety awareness in schools and villages</li>
+            <li data-edit="s3-item4">Support forest teams during the fire season</li>
+          </ul>
+          <p id="group-join" hidden style="margin-top:22px;">
+            <a class="btn btn-leaf" id="group-link" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Join our WhatsApp group</a>
+          </p>
+        </div>
+
+        <div class="glass card reveal" id="form-card">
+          <form class="form" id="volunteer-form" novalidate>
+            <div class="field">
+              <label for="name">Full name <span class="req">*</span></label>
+              <input class="input" id="name" maxlength="100" required autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="location">Location <span class="req">*</span></label>
+              <input class="input" id="location" maxlength="150" required placeholder="e.g. Kotli, Azad Kashmir" autocomplete="address-level2" />
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label for="email">Email <span class="req">*</span></label>
+                <input class="input" id="email" type="email" maxlength="200" required autocomplete="email" />
+              </div>
+              <div class="field">
+                <label for="phone">Phone number <span class="req">*</span></label>
+                <input class="input" id="phone" type="tel" maxlength="30" required placeholder="03xx xxxxxxx" autocomplete="tel" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="motivation">Why do you want to volunteer? <span class="req">*</span></label>
+              <textarea class="textarea" id="motivation" maxlength="2000" required placeholder="What motivates you, and how would you like to help?"></textarea>
+              <span class="hint"><span id="count">0</span> / 2000</span>
+            </div>
+            <!-- Spam trap: real people never fill this in -->
+            <div class="honeypot" aria-hidden="true">
+              <label for="website">Website</label>
+              <input id="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <div id="form-status"></div>
+            <button class="btn btn-fire btn-lg" type="submit" id="submit-btn">
+              <i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Send application
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quote -->
+    <section class="page-quote" data-edit-group="Quote">
+      <figure class="container reveal">
+        <blockquote data-edit="quote">What you do makes a difference, and you have to decide what kind of difference you want to make.</blockquote>
+        <figcaption data-edit="quoteby">Jane Goodall</figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { initSite, initReveal, toast } from "/js/site.js";
+    import { esc } from "/js/common.js";
+    import { initFirebase, ensureUser, COLLECTIONS } from "/js/firebase-init.js";
+    import { REGIONS, loadVolunteers, loadPublicGroupLink, initials } from "/js/volunteers.js";
+    import { collection, addDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    initSite();
+
+    const $ = (id) => document.getElementById(id);
+    let firebase = null;
+    try { firebase = await initFirebase(); } catch (err) { console.warn("[FIRO] Firebase unavailable:", err); }
+
+    /* ── Featured volunteers ─────────────────────────────── */
+    const people = await loadVolunteers(firebase?.db);
+    const regions = Object.keys(REGIONS).filter((r) => people.some((p) => p.region === r));
+    $("region-filter").innerHTML = ["", ...regions].map((r) => `
+      <label class="choice"><input type="radio" name="region" value="${r}" ${r === "" ? "checked" : ""} />${r ? esc(REGIONS[r]) : "All"}</label>`).join("");
+    $("region-filter").parentElement.hidden = regions.length < 2;
+
+    const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "");
+    function render() {
+      const region = document.querySelector('input[name="region"]:checked')?.value || "";
+      const list = people.filter((p) => !region || p.region === region);
+      $("volunteers").innerHTML = list.map((p) => `
+        <article class="glass volunteer-card reveal">
+          ${p.photo ? `<img class="volunteer-photo" src="${esc(p.photo)}" alt="${esc(p.name)}" loading="lazy" />`
+                    : `<div class="avatar ${p.region === "ajk" ? "fire" : ""}">${esc(initials(p.name))}</div>`}
+          <span class="tag">${esc(REGIONS[p.region] || "")}</span>
+          <h3>${esc(p.name)}</h3>
+          ${p.role ? `<div class="role">${esc(p.role)}</div>` : ""}
+          ${p.story ? `<p>${esc(p.story)}</p>` : ""}
+          ${safeUrl(p.link) ? `<a class="read-more" href="${esc(safeUrl(p.link))}" target="_blank" rel="noopener">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>` : ""}
+        </article>`).join("") || `<div class="empty" style="grid-column:1/-1;">Stories of volunteers will appear here soon.</div>`;
+      initReveal($("volunteers"));
+    }
+    $("region-filter").addEventListener("change", render);
+    render();
+
+    /* ── WhatsApp group (only if the admin made it public) ── */
+    if (firebase) {
+      const link = await loadPublicGroupLink(firebase.db);
+      if (link) { $("group-link").href = link; $("group-join").hidden = false; }
+    }
+
+    /* ── Become a volunteer ─────────────────────────────── */
+    const form = $("volunteer-form"), statusEl = $("form-status"), submit = $("submit-btn");
+    const RATE_KEY = "firo_volunteer_sent_at";
+    $("motivation").addEventListener("input", () => { $("count").textContent = $("motivation").value.length; });
+    if (!firebase) {
+      statusEl.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><div>The form is temporarily unavailable.</div></div>`;
+      submit.disabled = true;
+    }
+
+    function showStatus(kind, html) {
+      const icon = kind === "error" ? "fa-circle-exclamation" : "fa-circle-check";
+      statusEl.innerHTML = `<div class="alert alert-${kind}"><i class="fa-solid ${icon}" aria-hidden="true"></i><div>${html}</div></div>`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      statusEl.innerHTML = "";
+      const val = (id) => $(id).value.trim();
+      const data = { name: val("name"), location: val("location"), email: val("email"), phone: val("phone"), motivation: val("motivation") };
+      if (val("website")) return;  // bot
+      if (Object.values(data).some((v) => !v)) return showStatus("error", "Please fill in every field.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return showStatus("error", "Please enter a valid email address.");
+      if (!/^[+\d][\d\s()-]{6,}$/.test(data.phone)) return showStatus("error", "Please enter a valid phone number.");
+
+      let last = 0;
+      try { last = Number(localStorage.getItem(RATE_KEY)) || 0; } catch {}
+      if (Date.now() - last < 60_000) return showStatus("error", "You just sent an application. Please wait a minute before sending another.");
+
+      submit.disabled = true;
+      submit.innerHTML = `<span class="spinner" style="width:18px;height:18px;"></span> Sending…`;
+      try {
+        await ensureUser(firebase.auth);
+        await addDoc(collection(firebase.db, COLLECTIONS.applications), {
+          ...data, status: "pending", created_at: serverTimestamp(), created_ms: Date.now(),
+        });
+        try { localStorage.setItem(RATE_KEY, String(Date.now())); } catch {}
+        form.reset();
+        $("count").textContent = "0";
+        showStatus("success", `Thank you, ${esc(data.name)}! Your application has been received. Once the team approves it, you will get an invite to the volunteers' WhatsApp group.`);
+        toast("Application sent", "success");
+      } catch (err) {
+        console.error("[FIRO] Volunteer form failed:", err);
+        showStatus("error", "Sorry, your application could not be sent. Please try again in a moment.");
+      } finally {
+        submit.disabled = false;
+        submit.innerHTML = `<i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i> Send application`;
+      }
+    });
+  </script>
+</body>
+</html>
